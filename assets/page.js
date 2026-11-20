@@ -539,15 +539,18 @@
       return false;
     }
     flushNotes();      /* stop the note timers first, so none of them writes after the reset */
-    state = {};       /* this page's steps */
     var extra = Object.keys(others).length;
-    if (extra && ask("This plan also has " + extra + " saved mark" + (extra === 1 ? "" : "s") + " for steps this page doesn't have (from another build of run " + RUN + "). Clear " + (extra === 1 ? "it" : "them") + " too?")) {
-      others = Object.create(null);
-    }
+    var clearOthers = !!extra && ask("This plan also has " + extra + " saved mark" + (extra === 1 ? "" : "s") + " for steps this page doesn't have (from another build of run " + RUN + "). Clear " + (extra === 1 ? "it" : "them") + " too?");
+    /* another tab may have saved while the questions were open: read storage again, so its newest marks are the
+       ones kept, then clear this page's steps (and the others if asked) */
+    readStore();
+    state = {};
+    if (clearOthers) others = Object.create(null);
+    var kept = Object.keys(others).length;
     dirty = {};
     paintAll(true);
     writeStore();
-    say("Marks and notes cleared.", "ok");
+    say(kept ? "Marks and notes on this page cleared; " + kept + " saved mark" + (kept === 1 ? "" : "s") + " for steps this page doesn't have kept." : "Marks and notes cleared.", "ok");
     return true;
   }
 
