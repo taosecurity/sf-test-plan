@@ -33,10 +33,13 @@ jobs:
           python-version: ${{ matrix.python }}
       - name: Unit tests
         run: python -I -m unittest discover -s tests -v
-      - name: Release zip builds from the files on disk
-        run: python -I build_release.py --allow-dirty
-      - name: Release zip builds from the commit (the way releases are built; this checksum is the one compared)
-        run: python -I build_release.py
+      - name: Release zip builds from the commit and from the files on disk, with the same checksum
+        shell: bash
+        run: |
+          python -I build_release.py --allow-dirty
+          cp dist/*.sha256 disk.sha256
+          python -I build_release.py
+          cmp disk.sha256 dist/*.sha256
       - name: Keep the checksum
         if: matrix.python == '3.13'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2

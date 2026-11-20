@@ -580,9 +580,9 @@
     state = {};
     var read = readStore();
     if (read === "damaged" || read === "unavailable") {
-      /* Nothing readable to take over: keep the marks this tab shows (the next save writes them back). */
+      /* Nothing readable to take over: keep the marks this tab shows and save them again now. */
       state = mine;
-      sayStatus();
+      writeStore();
       return;
     }
     Object.keys(dirty).forEach(function (id) {
