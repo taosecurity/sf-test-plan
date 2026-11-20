@@ -148,7 +148,7 @@ try {
 
   await click(a, 'pass'); await sleep(100);
   await load(true);
-  // a stored mark made for a different step text (a rebuild reused the id) stays hidden but is kept
+  // a mark another build saved for a step this page doesn't have survives this page's saves and its Reset
   {
     const s0 = await stored();
     // a mark another build saved for a step number this page doesn't have stays in storage through a save
@@ -157,8 +157,11 @@ try {
     await load(true);
     await click(a, 'pass'); await click(a, 'pass'); await sleep(100);   // any save
     check("a stored mark for a step this page doesn't have is kept through a save", (await stored())?.checks?.['998.7']?.n === 'other build');
-    const s1 = await stored(); delete s1.checks['998.7'];
-    await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(s1))})`);
+    const before = await stored();
+    await ev(`sfTestplan.reset({confirm: () => true})`); await sleep(100);
+    check("Reset clears this page's steps but keeps another build's mark", (await stored())?.checks?.['998.7']?.n === 'other build' && (await markOf(a)) === '');
+    delete before.checks['998.7'];   // put this page's marks back for the rest of the test
+    await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(before))})`);
     await load(true);
   }
   check('reload keeps marks and notes', (await markOf(a)) === 'pass' && (await noteOf(a)) === 'first note' && (await markOf(c)) === 'pass' && (await noteOf(c)) === HOSTILE && (await noteOf(b)) === 'typed slowly' && (await liHas(a, 'is-pass')), `${await markOf(a)} ${await noteOf(a)} ${await markOf(c)}`);

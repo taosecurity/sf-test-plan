@@ -12,6 +12,7 @@
   var RESULTS = ["pass", "fail", "skip"];
   var NOTE_DELAY = 600;
   var MAX_NOTE = 20000;
+  var MAX_OTHERS = 200;   /* stored marks kept for step numbers this page doesn't have (newest first) */
 
   var CFG = {};
   try { CFG = JSON.parse(document.getElementById("tp-config").textContent) || {}; } catch (e) { CFG = {}; }
@@ -86,7 +87,9 @@
     dirty = {};
     if (!storageOk) { sayStatus(); return; }
     var keep = Object.create(null);
-    Object.keys(others).forEach(function (id) { keep[id] = others[id]; });
+    /* keep the newest MAX_OTHERS of them, so marks for steps no build has any more can't fill the storage */
+    Object.keys(others).sort(function (x, y) { return (others[y].at || "") < (others[x].at || "") ? -1 : 1; })
+      .slice(0, MAX_OTHERS).forEach(function (id) { keep[id] = others[id]; });
     Object.keys(state).forEach(function (id) { if (hasAny(state[id])) keep[id] = state[id]; });
     try {
       if (Object.keys(keep).length) {
@@ -534,14 +537,12 @@
   function doReset(opts) {
     opts = opts || {};
     var ask = opts.confirm || function (q) { return window.confirm(q); };
-    var extra = Object.keys(others).length;
-    if (!ask("Clear every mark and note saved for this plan's run " + RUN + (extra ? " (" + extra + " of them for steps this page doesn't have)" : "") + "? Use Export first if you want to keep them.")) {
+    if (!ask("Clear every mark and note on this page (run " + RUN + ")? Use Export first if you want to keep them.")) {
       say("Nothing cleared.");
       return false;
     }
     flushNotes();      /* stop the note timers first, so none of them writes after the reset */
-    state = {};
-    others = Object.create(null);   /* everything saved for this plan's run, other builds' step numbers included */
+    state = {};       /* this page's steps only: marks another build saved for steps not on this page stay */
     dirty = {};
     paintAll(true);
     writeStore();
