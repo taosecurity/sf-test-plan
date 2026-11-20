@@ -580,9 +580,14 @@
     state = {};
     var read = readStore();
     if (read === "damaged" || read === "unavailable") {
-      /* Nothing readable to take over: keep the marks this tab shows and save them again now. */
+      /* Nothing readable to take over: keep the marks this tab shows, write nothing (so tabs never answer each
+         other's saves), and say plainly that they aren't saved until the next change here. */
       state = mine;
-      writeStore();
+      if (read === "damaged") {
+        lastSaved = "";
+        say("Another tab left saved marks this page can't read. The marks shown here are saved again with your next change; use Export to keep a copy now.", "warn");
+      }
+      sayStatus();
       return;
     }
     Object.keys(dirty).forEach(function (id) {

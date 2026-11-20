@@ -175,8 +175,12 @@ try {
     await load(true);
     // another tab writes damaged data: this tab keeps the marks it shows
     await ev(`localStorage.setItem(sfTestplan.key, '{not json'); window.dispatchEvent(new StorageEvent('storage', {key: sfTestplan.key}))`); await sleep(100);
-    check('damaged data from another tab leaves the marks shown here as they were and saves them again',
-      (await markOf(a)) === 'pass' && (await noteOf(a)) === 'first note' && (await stored())?.checks?.[a]?.n === 'first note', `${await markOf(a)} ${await noteOf(a)}`);
+    // (a same-tab StorageEvent: the test doesn't cover two real tabs racing)
+    const dmgLine = await ev(`document.getElementById('saved').textContent`);
+    const dmgMsg = await ev(`(document.getElementById('toolmsg')||{}).textContent||''`);
+    check("damaged data from another tab keeps the marks shown here, writes nothing and says they aren't saved yet",
+      (await markOf(a)) === 'pass' && (await noteOf(a)) === 'first note' && (await ev(`localStorage.getItem(sfTestplan.key)`)) === '{not json' &&
+      !/Saved in this browser at/.test(dmgLine) && /can't read/.test(dmgMsg), `${await markOf(a)} | ${dmgLine} | ${dmgMsg}`);
     await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(before))})`);
     await load(true);
     // another tab removes the saved marks: the save line drops the old "Saved at" time
