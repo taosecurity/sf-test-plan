@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Page test: waits up to 30 seconds for Chrome to start (set `TP_CDP_WAIT`, from 1 to 600 seconds, to change it), because a fresh CI runner can take more than 10 seconds. Each request to Chrome gives up after 1 second, so the wait ends on time, and the timeout message names the setting.
+- Page test: waits up to 30 seconds for Chrome to start (set `TP_CDP_WAIT`, from 1 to 600 seconds, to change it), because a fresh CI runner can take more than 10 seconds. One timer covers the whole start, including connecting to Chrome, so the test can't hang there, and the timeout message names the setting. The README now says the page test needs Node 22 or newer.
 
 ## 0.1.1 (2026-11-20)
 

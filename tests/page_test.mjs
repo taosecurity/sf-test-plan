@@ -38,20 +38,23 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function finish(code) { try { proc.kill(); } catch { } try { rmSync(work, { recursive: true, force: true }); } catch { } process.exit(code); }
 
 let targets = [];
-// Chrome's first start on a fresh machine (a CI runner) can take well over 10 seconds. TP_CDP_WAIT sets the wait in
-// seconds (1 to 600, default 30); each request to Chrome gives up after 1 second, so the wait really ends on time.
+// Chrome's first start on a fresh machine (a CI runner) can take well over 10 seconds. One timer covers the whole
+// start (finding the page on the DevTools port and connecting to it); TP_CDP_WAIT sets it in seconds (1 to 600, default 30).
 const waitEnv = Number(process.env.TP_CDP_WAIT);
 const waitSecs = waitEnv >= 1 && waitEnv <= 600 ? waitEnv : 30;
 if (process.env.TP_CDP_WAIT && waitSecs !== waitEnv) console.log(`TP_CDP_WAIT=${process.env.TP_CDP_WAIT} isn't a number of seconds from 1 to 600; waiting 30.`);
-const deadline = Date.now() + waitSecs * 1000;
-while (Date.now() < deadline && !targets.some((t) => t.type === 'page')) {
-  try { targets = await (await fetch(`http://127.0.0.1:${port}/json`, { signal: AbortSignal.timeout(1000) })).json(); } catch { }
+const startTimer = setTimeout(() => {
+  console.log(`Chrome didn't start and connect on its DevTools port ${port} within ${waitSecs} second${waitSecs === 1 ? '' : 's'}. Close other headless Chrome windows using the profile, set TP_CDP_PORT, or set TP_CDP_WAIT to wait longer.`);
+  finish(2);
+}, waitSecs * 1000);
+while (!targets.some((t) => t.type === 'page')) {
+  try { const list = await (await fetch(`http://127.0.0.1:${port}/json`)).json(); if (Array.isArray(list)) targets = list; } catch { }
   await sleep(200);
 }
 const target = targets.find((t) => t.type === 'page');
-if (!target) { console.log(`Chrome did not open its DevTools port ${port} within ${waitSecs} second${waitSecs === 1 ? '' : 's'}. Close other headless Chrome windows using the profile, set TP_CDP_PORT, or set TP_CDP_WAIT to wait longer.`); finish(2); }
 const ws = new WebSocket(target.webSocketDebuggerUrl);
 await new Promise((r) => ws.addEventListener('open', r));
+clearTimeout(startTimer);
 
 let seq = 0; const waits = {}; const errors = []; const dialogs = []; let dialogAnswer = true;
 const send = (method, params = {}) => new Promise((r) => { const i = ++seq; waits[i] = r; ws.send(JSON.stringify({ id: i, method, params })); });
