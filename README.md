@@ -105,8 +105,9 @@ Steps whose `log:` rules all passed are marked Pass; any failed rule marks the s
 
 - Run the command again with `--verbose` to see what was read and decided, or `--log sf-test-plan.log` to save the same details to a file. The log names the plan, each group and step it read, each warning and why, and the files it wrote. Attach it when you report a problem.
 - **"run ... isn't allowed"**: use only letters, digits, `.`, `_` and `-` in `run:`.
-- **Marks are gone**: the page's `run:` changed (a new round starts empty: import the old marks file if you need them), or the browser cleared its site data.
-- **Marks are per browser and per plan**: a browser keeps marks for a plan by its folder and file name, `mod:` and `run:`, and keeps a mark only for the step it was made for (a rebuild that changes a step drops that step's old mark), so copies of the same page in that browser share marks, while another browser or computer starts empty. Export on one, Import on the other.
+- **Marks are gone**: the page's `run:` or `mod:` changed, the plan file or its folder was renamed or moved (a new round starts empty: import the old marks file if you need them), or the browser cleared its site data. Export before you rename or move a plan.
+- **A step shows a mark from an older build**: marks are kept by step number. When a new build changes its steps, give it a new `run:` so it starts fresh.
+- **Marks are per browser and per plan**: a browser keeps marks for a plan by its folder and file name, `mod:` and `run:`, so copies of the same page in that browser share marks, while another browser or computer starts empty. Export on one, Import on the other.
 
 ## Background
 

@@ -151,15 +151,15 @@ try {
   // a stored mark made for a different step text (a rebuild reused the id) stays hidden but is kept
   {
     const s0 = await stored();
-    const other = ids.find((x) => x !== a && x !== b && x !== c);
-    if (other) {
-      s0.checks[other] = { r: 'fail', n: 'old step', at: '2001-01-01T00:00:00Z', src: 'page', t: 'A step this page does not have' };
-      await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(s0))})`);
-      await load(true);
-      check('a stored mark for different step text is not shown on the new step', (await markOf(other)) === '' && (await noteOf(other)) === '');
-      await click(a, 'pass'); await click(a, 'pass'); await sleep(100);   // any save
-      check('that old mark is dropped at the next save', !(await stored())?.checks?.[other]);
-    }
+    // a mark another build saved for a step number this page doesn't have stays in storage through a save
+    s0.checks['998.7'] = { r: 'fail', n: 'other build', at: '2001-01-01T00:00:00Z', src: 'page' };
+    await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(s0))})`);
+    await load(true);
+    await click(a, 'pass'); await click(a, 'pass'); await sleep(100);   // any save
+    check("a stored mark for a step this page doesn't have is kept through a save", (await stored())?.checks?.['998.7']?.n === 'other build');
+    const s1 = await stored(); delete s1.checks['998.7'];
+    await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(s1))})`);
+    await load(true);
   }
   check('reload keeps marks and notes', (await markOf(a)) === 'pass' && (await noteOf(a)) === 'first note' && (await markOf(c)) === 'pass' && (await noteOf(c)) === HOSTILE && (await noteOf(b)) === 'typed slowly' && (await liHas(a, 'is-pass')), `${await markOf(a)} ${await noteOf(a)} ${await markOf(c)}`);
   check('a hostile stored note stays text after reload', (await ev(`document.querySelectorAll('img').length`)) === 0);
@@ -273,9 +273,6 @@ try {
     await ev(`sfTestplan.importData(${JSON.stringify(mk('my own note', '2031-01-01T00:00:00Z', 'page'))}, {confirm: () => true})`);
     await ev(`sfTestplan.importData(${JSON.stringify(mk('Log: loaded PASS.', '2032-01-01T00:00:00Z'))}, {confirm: () => true})`);
     check('ns: a typed note on a log mark survives Import and a newer log import', (await noteOf(e)) === 'my own note' && (await markOf(e)) === 'pass');
-    const wrong = { format: 'sf-test-plan-marks/1', run, title: 't', exported: '2033-01-01T00:00:00Z', checks: [{ id: e, r: 'fail', n: 'other build', t: 'A different step', g: 1, at: '2033-01-01T00:00:00Z', src: 'page' }] };
-    const rw = await ev(`sfTestplan.importData(${JSON.stringify(wrong)}, {confirm: () => true})`);
-    check('import skips a mark made for a different step with the same number', (await markOf(e)) === 'pass' && /different step/.test(rw && rw.message || ''), rw && rw.message);
     await click(e, 'pass'); await sleep(50);
     await ev(`(()=>{const t=document.getElementById('n-${safe(e)}'); t.value=''; t.dispatchEvent(new Event('input'));})()`); await sleep(800);
   }
