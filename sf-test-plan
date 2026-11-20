@@ -1,0 +1,3 @@
+#!/bin/sh
+# sf-test-plan for Linux and macOS: runs sf_test_plan.py next to this file.
+exec python3 -I "$(dirname "$0")/sf_test_plan.py" "$@"

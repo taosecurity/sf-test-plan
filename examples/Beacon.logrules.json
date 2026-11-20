@@ -1,0 +1,14 @@
+{
+ "mod": "Beacon Mod",
+ "version": "0.1.0",
+ "plugins": ["BeaconMod.esm"],
+ "prefix": "BeaconMod: ",
+ "expect": [
+  {"id": "loaded", "re": "BeaconMod: loaded \\d", "show": "BeaconMod: loaded 0.1.0", "means": "The mod's quest started."},
+  {"id": "placed", "re": "BeaconMod: beacon placed", "show": "BeaconMod: beacon placed at ...", "means": "A beacon was dropped and activated."},
+  {"id": "restored", "re": "BeaconMod: \\d+ beacons restored", "show": "BeaconMod: 1 beacons restored", "means": "Beacons came back after a load."}
+ ],
+ "forbid": [
+  {"id": "no-light", "re": "BeaconMod: light failed", "means": "The beacon's light couldn't be made."}
+ ]
+}

@@ -1,0 +1,35 @@
+{
+ "tool": "papyrus-log-check",
+ "version": "0.3.1",
+ "author": "Example Author",
+ "license": "MIT",
+ "url": "https://example.com/papyrus-log-check",
+ "run": "20261119-210400",
+ "package": {"name": "StarfieldLogs-20261119-205000.zip", "kind": "zip", "sha256": "0000", "stamp": "20261119-205000",
+             "plugins_txt": true, "manifest": {}, "logs": []},
+ "rule_files": [{"mod": "Beacon Mod", "version": "0.1.0", "path": "Beacon.logrules.json", "rule_file_version": "0.1.0"}],
+ "mods": [
+  {"mod": "Beacon Mod", "version": "0.1.0", "rules_file": "Beacon.logrules.json", "rule_file_version": "0.1.0",
+   "plugins": ["BeaconMod.esm"], "plugin_state": "active", "named_in_note": true, "prefix_lines": 3,
+   "first_prefix": {"log": "Papyrus.0.log", "line": 10, "text": "BeaconMod: loaded 0.1.0"},
+   "last_prefix": {"log": "Papyrus.0.log", "line": 40, "text": "BeaconMod: light failed"},
+   "logs": ["Papyrus logs"], "status": "FAIL",
+   "rules": [
+    {"kind": "expect", "id": "loaded", "status": "PASS", "min": 1, "always": false, "count": 1,
+     "pattern": "BeaconMod: loaded \\d", "means": "The mod's quest started.",
+     "lines": [{"log": "Papyrus.0.log", "line": 10, "text": "BeaconMod: loaded 0.1.0"}], "other_version_lines": []},
+    {"kind": "expect", "id": "placed", "status": "FAIL", "min": 2, "always": false, "count": 1,
+     "pattern": "BeaconMod: beacon placed", "means": "A beacon was dropped and activated.",
+     "lines": [{"log": "Papyrus.0.log", "line": 20, "text": "BeaconMod: beacon placed at 1,2,3"}], "other_version_lines": []},
+    {"kind": "expect", "id": "restored", "status": "NOT SEEN", "min": 1, "always": false, "count": 0,
+     "pattern": "BeaconMod: \\d+ beacons restored", "means": "Beacons came back after a load.",
+     "lines": [], "other_version_lines": []},
+    {"kind": "forbid", "id": "no-light", "status": "PASS", "count": 0, "pattern": "BeaconMod: light failed",
+     "means": "The beacon's light couldn't be made.", "lines": []},
+    {"kind": "forbid", "id": "no-crash", "status": "FAIL", "count": 1, "pattern": "BeaconMod: crash",
+     "means": "Crash line.", "lines": [{"log": "Papyrus.0.log", "line": 41, "text": "BeaconMod: crash"}]},
+    {"kind": "script-errors", "id": "script errors", "status": "PASS", "count": 0, "warnings": 0, "groups": []}
+   ]}
+ ],
+ "flags": [], "other_errors": [], "rule_errors": [], "overall": "FAIL"
+}

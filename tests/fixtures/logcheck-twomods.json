@@ -1,0 +1,19 @@
+{
+ "tool": "papyrus-log-check",
+ "version": "0.3.1",
+ "run": "20261119-210600",
+ "rule_files": [],
+ "mods": [
+  {"mod": "Other Mod", "version": "1.0.0", "plugins": ["OtherMod.esm"], "plugin_state": "active", "status": "PASS",
+   "prefix_lines": 1, "rules": [
+    {"kind": "expect", "id": "loaded", "status": "PASS", "min": 1, "always": false, "count": 1, "pattern": "x",
+     "means": "", "lines": [], "other_version_lines": []}
+   ]},
+  {"mod": "Beacon Mod", "version": "0.1.0", "plugins": ["BeaconMod.esm"], "plugin_state": "active", "status": "NOT SEEN",
+   "prefix_lines": 0, "rules": [
+    {"kind": "expect", "id": "loaded", "status": "NOT SEEN", "min": 1, "always": false, "count": 0, "pattern": "y",
+     "means": "", "lines": [], "other_version_lines": []}
+   ]}
+ ],
+ "flags": [], "other_errors": [], "rule_errors": [], "overall": "OK"
+}

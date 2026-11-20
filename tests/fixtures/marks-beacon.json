@@ -1,0 +1,15 @@
+{
+ "format": "sf-test-plan-marks/1",
+ "run": "beacon-0.1.0",
+ "title": "Beacon Mod test plan",
+ "exported": "2026-11-19T21:04:00Z",
+ "tool": "sf-test-plan 0.1.0",
+ "future_field": "ignored",
+ "checks": [
+  {"id": "1.1", "r": "pass", "n": "", "t": "Start a new game.", "g": 1, "at": "2026-11-19T20:58:10Z", "src": "page"},
+  {"id": "1.2", "r": "fail", "n": "No Beacon group in Gameplay options.", "t": "Open Settings > Gameplay.", "g": 1, "at": "2026-11-19T20:59:00Z", "src": "page", "extra": 1},
+  {"id": "2.1", "r": "pass", "n": "Took two tries.", "t": "Type the command.", "g": 2, "at": "2026-11-19T21:00:00Z", "src": "page"},
+  {"id": "2.2", "r": "skip", "n": "", "t": "Drop the beacon.", "g": 2, "at": "2026-11-19T21:01:00Z", "src": "page"},
+  {"id": "3.1", "r": "", "n": "Ran out of time.", "t": "Save and load.", "g": 3, "at": "2026-11-19T21:02:00Z", "src": "page"}
+ ]
+}

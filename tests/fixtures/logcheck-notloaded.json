@@ -1,0 +1,12 @@
+{
+ "tool": "papyrus-log-check",
+ "version": "0.3.1",
+ "run": "20261119-210500",
+ "rule_files": [{"mod": "Beacon Mod", "version": "0.1.0", "path": "Beacon.logrules.json", "rule_file_version": "0.1.0"}],
+ "mods": [
+  {"mod": "Beacon Mod", "version": "0.1.0", "rules_file": "Beacon.logrules.json", "rule_file_version": "0.1.0",
+   "plugins": ["BeaconMod.esm"], "plugin_state": "inactive", "named_in_note": false, "rules": [], "prefix_lines": 0,
+   "first_prefix": null, "last_prefix": null, "logs": ["Papyrus logs"], "status": "NOT LOADED"}
+ ],
+ "flags": [], "other_errors": [], "rule_errors": [], "overall": "OK"
+}

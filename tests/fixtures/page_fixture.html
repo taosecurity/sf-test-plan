@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Beacon Mod test plan</title>
+<!-- Hand-written fixture for tests/page_test.mjs, following FORMAT.md section 2 (sf-test-plan 0.1.0).
+     It loads the real script from ../../assets/page.js; the small style block below only stands in for
+     assets/page.css so the screenshots are readable. -->
+<style>
+:root{--bg:#fbfaf7;--fg:#1d1d1b;--muted:#6b6b66;--line:#d9d6cf;--card:#ffffff;--pass:#2f7d4a;--fail:#b3372f;--skip:#8a6d1e;color-scheme:light}
+@media (prefers-color-scheme: dark){:root{--bg:#161614;--fg:#ecebe6;--muted:#a3a29b;--line:#3a3935;--card:#201f1c;--pass:#6cc48a;--fail:#ef7a70;--skip:#d9b65a;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,sans-serif}
+code{font-family:ui-monospace,Consolas,monospace;overflow-wrap:anywhere}
+.check{list-style:none;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:10px;margin:8px 0}
+.check.is-pass{border-left:4px solid var(--pass)} .check.is-fail{border-left:4px solid var(--fail)} .check.is-skip{border-left:4px solid var(--skip)}
+.expect,.hint{color:var(--muted);font-size:14px}
+.seg{display:flex;gap:4px;margin-top:6px}
+.seg input{position:absolute;opacity:0}
+.seg label{border:1px solid var(--line);border-radius:6px;padding:2px 10px;cursor:pointer}
+.seg input:checked+label{background:var(--fg);color:var(--bg)}
+.note textarea{width:100%;margin-top:6px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:6px}
+.logbadge{display:inline-block;font-size:12px;border:1px solid var(--pass);color:var(--pass);border-radius:10px;padding:0 8px;margin-top:4px}
+.tally{display:flex;gap:12px;flex-wrap:wrap}
+.tools{display:flex;gap:8px;flex-wrap:wrap}
+.copycmd{font-size:11px;margin-left:4px}
+.saved.warn,.toolmsg.warn{color:var(--fail)} .saved.ok,.toolmsg.ok{color:var(--pass)}
+.copy-fallback{width:100%}
+ul.checks{padding:0}
+</style>
+</head>
+<body>
+<script type="application/json" id="tp-config">{"format":"sf-test-plan-page/1","run":"fixture-0.1.0","title":"Beacon Mod test plan","tool":"sf-test-plan 0.1.0"}</script>
+<header>
+  <h1>Beacon Mod test plan</h1>
+  <div class="facts"><span>Mod: Beacon Mod</span> <span>Version: 0.1.0</span> <span>Zip: <code>BeaconMod-0.1.0.zip</code></span></div>
+  <p>This plan tests Beacon Mod 0.1.0, a made-up example mod. Start with the smoke test.</p>
+</header>
+
+<div class="status">
+  <span id="saved" class="saved"></span>
+  <div class="bar" id="tally" data-total="6"></div>
+  <div class="tools" id="tools">
+    <button type="button" data-act="export">Export</button>
+    <button type="button" data-act="import">Import</button>
+    <button type="button" data-act="copy">Copy results</button>
+    <button type="button" data-act="reset">Reset</button>
+    <input type="file" id="importfile" accept=".json,application/json" hidden>
+  </div>
+</div>
+
+<section class="setup">
+  <h2>Before you start</h2>
+  <ol>
+    <li>Install BeaconMod-0.1.0.zip with your mod manager and enable it.</li>
+    <li>Turn on Papyrus logging.</li>
+  </ol>
+</section>
+
+<section id="smoke">
+  <h2>Smoke test</h2>
+  <ul class="checks">
+    <li class="check" data-id="1.1" data-group="1" data-smoke="1" data-log="loaded"><div class="what"><div>Start a new game and finish the character creator.</div><div class="expect">Expect: no error message about Beacon Mod.</div></div></li>
+    <li class="check" data-id="1.2" data-group="1" data-smoke="1" data-log=""><div class="what"><div>Open <strong>Settings &gt; Gameplay</strong>.</div><div class="expect">Expect: a "Beacon" group with "Show Debug Messages (PC only)", off by default.</div></div></li>
+    <li class="check" data-id="2.1" data-group="2" data-smoke="1" data-log=""><div class="what"><div>Open the console and type <code class="cmd">player.additem 0001A2B3 1</code>.</div><div class="expect">Expect: one Beacon in your inventory.</div></div></li>
+    <li class="check" data-id="2.2" data-group="2" data-smoke="1" data-log="placed"><div class="what"><div>Drop the beacon and activate it.</div><div class="expect">Expect: the message "Beacon placed." and a light on the ground.</div></div></li>
+  </ul>
+</section>
+
+<details id="deep">
+  <summary>Deep checks (optional)</summary>
+  <section class="group" id="g2">
+    <h2>2 Main feature</h2>
+    <ul class="checks">
+      <li class="check" data-id="2.3" data-group="2" data-smoke="0" data-log=""><div class="what"><div>Pick the beacon up again.</div><div class="expect">Expect: it goes back to your inventory.</div><div class="hint">Try it in a building too; <a href="https://example.com/beacon">the mod page</a> says it works indoors.</div></div></li>
+    </ul>
+  </section>
+  <section class="group" id="g3">
+    <h2>3 Save and load</h2>
+    <ul class="checks">
+      <li class="check" data-id="3.1" data-group="3" data-smoke="0" data-log="restored"><div class="what"><div>Save, quit to the main menu and load the save. A long unbroken command for the phone-width test: <code class="cmd">player.additem 0001A2B3 1000000000000000000000000000000</code></div><div class="expect">Expect: a placed beacon is still there.</div></div></li>
+    </ul>
+  </section>
+</details>
+
+<script src="../../assets/page.js"></script>
+</body>
+</html>
