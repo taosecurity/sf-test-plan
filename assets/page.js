@@ -54,6 +54,17 @@
   var others = Object.create(null);
   var lastSaved = "";   /* ISO time of the last write to storage */
   var storeDamaged = false;   /* the saved copy can't be read (found at start or after another tab's save); cleared by the next good read or save */
+  /* The saved copy is a newer major store format (from a newer sf-test-plan). This page never writes over it:
+     marks stay in memory until a read finds format 1 again or nothing saved (FORMAT.md 2). */
+  var storeNewer = false;
+
+  /* The major version of a saved copy's format: a missing format counts as 1; anything that isn't
+     "sf-test-plan-store/<n>" gives NaN. */
+  function storeMajor(data) {
+    if (data.format === undefined) return 1;
+    if (typeof data.format !== "string" || !/^sf-test-plan-store\/\d/.test(data.format)) return NaN;
+    return parseInt(data.format.split("/")[1], 10);
+  }
 
   function sanitizeEntry(v) {
     if (!v || typeof v !== "object") return null;
@@ -66,16 +77,20 @@
     return { r: r, n: n, at: at, src: src, pn: v.pn === true || v.ns === "page" };
   }
   /* Reads the saved marks into state (this page's steps) and others. If storage can't be read or holds damaged
-     data, others is left as it was, so marks this tab already holds aren't lost.
-     Returns "ok", "empty" (nothing saved), "damaged" (saved data can't be read) or "unavailable" (no storage). */
+     or newer-format data, others is left as it was, so marks this tab already holds aren't lost.
+     Returns "ok", "empty" (nothing saved), "damaged" (saved data can't be read), "newer" (a newer major store
+     format, never written over) or "unavailable" (no storage). */
   function readStore() {
     if (!storageOk) return "unavailable";
     var raw = null;
     try { raw = window.localStorage.getItem(KEY); } catch (e) { storageOk = false; return "unavailable"; }
-    if (!raw) { others = Object.create(null); lastSaved = ""; storeDamaged = false; return "empty"; }
+    if (!raw) { others = Object.create(null); lastSaved = ""; storeDamaged = false; storeNewer = false; return "empty"; }
     var data = null;
     try { data = JSON.parse(raw); } catch (e) { data = null; }
-    if (!data || typeof data !== "object" || !data.checks || typeof data.checks !== "object") { lastSaved = ""; storeDamaged = true; return "damaged"; }
+    var major = data && typeof data === "object" ? storeMajor(data) : NaN;
+    if (major > 1) { lastSaved = ""; storeDamaged = false; storeNewer = true; return "newer"; }
+    storeNewer = false;
+    if (major !== 1 || !data.checks || typeof data.checks !== "object") { lastSaved = ""; storeDamaged = true; return "damaged"; }
     others = Object.create(null);
     Object.keys(data.checks).forEach(function (id) {
       var s = sanitizeEntry(data.checks[id]);
@@ -90,7 +105,7 @@
   var dirty = {};   /* ids changed here and not yet written (a note waiting for its pause) */
   function writeStore() {
     dirty = {};
-    if (!storageOk) { sayStatus(); return; }
+    if (!storageOk || storeNewer) { sayStatus(); return; }   /* never write over a newer sf-test-plan's saved copy */
     var keep = Object.create(null);
     Object.keys(others).forEach(function (id) { keep[id] = others[id]; });
     Object.keys(state).forEach(function (id) { if (hasAny(state[id])) keep[id] = state[id]; });
@@ -116,8 +131,11 @@
     if (!storageOk) {
       text = "Marks aren't saved in this browser: use Export before closing.";
       cls = "saved warn";
+    } else if (storeNewer) {
+      text = "The saved marks in this browser come from a newer sf-test-plan, so this page leaves them as they are and doesn't save the marks shown here. Use Export to keep them, or open the plan with that newer version.";
+      cls = "saved warn";
     } else if (storeDamaged) {
-      text = "The saved copy in this browser can't be read. Your next change replaces it with the marks shown here; use Export to keep a copy.";
+      text = "The saved copy in this browser can't be read. Your next saved change replaces it; use Export to keep a copy.";
       cls = "saved warn";
     } else if (lastSaved) {
       text = "Saved in this browser at " + localStamp(new Date(timeOf(lastSaved))) + ".";
@@ -469,6 +487,7 @@
     if (res.kept) parts.push(res.kept + " kept as they were, because the marks here are newer or are your own (a log mark never replaces them).");
     if (res.unknown.length) parts.push(res.unknown.length + " not on this page and not added: " + res.unknown.slice(0, 12).join(", ") + (res.unknown.length > 12 ? ", ..." : "") + ".");
     if (res.bad) parts.push(res.bad + " skipped because they were damaged or empty.");
+    if (storeNewer) parts.push("They aren't saved in this browser, because its saved marks come from a newer sf-test-plan; use Export to keep them.");
     res.message = parts.join(" ");
     return res;
   }
@@ -559,6 +578,7 @@
     writeStore();
     var kept = Object.keys(others).length;
     if (!storageOk) say("Marks and notes on this page cleared here, but this browser isn't saving: reload may bring them back.", "warn");
+    else if (read === "newer") say("Marks and notes on this page cleared. The saved marks in this browser come from a newer sf-test-plan, so they were left as they are.", "warn");
     else if (read === "damaged") say("Marks and notes on this page cleared. The saved copy in this browser couldn't be read, so it was replaced; Import an Export to bring back marks from other builds.", "warn");
     else say("Marks and notes on this page cleared." + (kept ? " " + kept + " saved mark" + (kept === 1 ? "" : "s") + " from another build (for steps this page doesn't have) kept." : ""), "ok");
     return true;
@@ -585,9 +605,9 @@
     var mine = state, oursWon = false;
     state = {};
     var read = readStore();
-    if (read === "damaged" || read === "unavailable") {
+    if (read === "damaged" || read === "newer" || read === "unavailable") {
       /* Nothing readable to take over: keep the marks this tab shows, write nothing (so tabs never answer each
-         other's saves), and say plainly that they aren't saved until the next change here. */
+         other's saves), and let the save line say why (sayStatus). */
       state = mine;
       sayStatus();
       return;

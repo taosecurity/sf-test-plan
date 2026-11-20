@@ -1,7 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 (2026-11-20)
 
+- The page now checks the format of the marks saved in the browser. When they come from a newer sf-test-plan (a newer major store format), the page never writes over them: it keeps its own marks in memory, and the save line says to use Export or open the plan with that newer version. Import and Reset follow the same rule and say that they saved nothing. Saved marks with no format still count as format 1, and saved marks with an unknown format name count as damaged.
+- The warning about a damaged saved copy now says that your next saved change replaces it. Marks kept from other builds are saved too, and notes save after their short pause.
+- The page test now waits for a page that Chrome lists with a connection address, instead of crashing when the address is missing.
+- If the page test loses its connection to Chrome during the run, it stops with its own message and exit code 2. A command that Chrome never answers fails after 30 seconds instead of hanging.
+- The page test has new checks for the store format: a newer format, a missing format, an unknown format name and format 1.
 - The page test now waits up to 30 seconds for Chrome to start, because Chrome's first start on a fresh CI runner can take more than 10 seconds. Set `TP_CDP_WAIT` (1 to 600 seconds) to change the wait.
 - One timer covers the whole start, including the connection to Chrome, so the test can't hang there. While the test waits for Chrome, a request for its page list that gets no answer is dropped after 5 seconds and sent again.
 - If Chrome lists the page but the connection to it fails, the test stops at once with its own message. The timeout message names `TP_CDP_WAIT`.

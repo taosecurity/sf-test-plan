@@ -47,12 +47,14 @@ const startTimer = setTimeout(() => {
   console.log(`Chrome didn't start and connect on its DevTools port ${port} within ${waitSecs} second${waitSecs === 1 ? '' : 's'}. Close other headless Chrome windows using the profile, set TP_CDP_PORT, or set TP_CDP_WAIT to wait longer.`);
   finish(2);
 }, waitSecs * 1000);
-while (!targets.some((t) => t.type === 'page')) {
+// a page Chrome lists without a webSocketDebuggerUrl (another client holds it) isn't one we can use: keep waiting
+const usable = (t) => t && t.type === 'page' && typeof t.webSocketDebuggerUrl === 'string' && t.webSocketDebuggerUrl.startsWith('ws');
+while (!targets.some(usable)) {
   // a stalled reply is dropped after 5 s and asked again; the start timer is the only hard limit
   try { const list = await (await fetch(`http://127.0.0.1:${port}/json`, { signal: AbortSignal.timeout(5000) })).json(); if (Array.isArray(list)) targets = list; } catch { }
   await sleep(200);
 }
-const target = targets.find((t) => t.type === 'page');
+const target = targets.find(usable);
 const ws = new WebSocket(target.webSocketDebuggerUrl);
 let connected = false;
 const failedToConnect = () => {   // only while connecting: later errors are not start-up failures
@@ -67,7 +69,15 @@ connected = true;
 clearTimeout(startTimer);
 
 let seq = 0; const waits = {}; const errors = []; const dialogs = []; let dialogAnswer = true;
-const send = (method, params = {}) => new Promise((r) => { const i = ++seq; waits[i] = r; ws.send(JSON.stringify({ id: i, method, params })); });
+// After the connection opens: losing it ends the test with exit 2, and a command Chrome never answers fails after 30 s.
+ws.addEventListener('close', () => { console.log(`Lost the connection to Chrome during the test. Run it again, and close other headless Chrome windows using the profile.`); finish(2); });
+const SEND_WAIT = 30;
+const send = (method, params = {}) => new Promise((resolve, reject) => {
+  const i = ++seq;
+  const t = setTimeout(() => { delete waits[i]; reject(new Error(`Chrome didn't answer ${method} within ${SEND_WAIT} seconds`)); }, SEND_WAIT * 1000);
+  waits[i] = (d) => { clearTimeout(t); resolve(d); };
+  ws.send(JSON.stringify({ id: i, method, params }));
+});
 ws.addEventListener('message', (m) => {
   const d = JSON.parse(m.data);
   if (d.id && waits[d.id]) { waits[d.id](d); delete waits[d.id]; }
@@ -198,7 +208,7 @@ try {
     const dmgLine = await ev(`document.getElementById('saved').textContent`);
     check("damaged data from another tab keeps the marks shown here, writes nothing and the save line says the next change replaces the unreadable copy",
       (await markOf(a)) === 'pass' && (await noteOf(a)) === 'first note' && (await ev(`localStorage.getItem(sfTestplan.key)`)) === '{not json' &&
-      /can't be read/.test(dmgLine) && /next change replaces it/.test(dmgLine), `${await markOf(a)} | ${dmgLine}`);
+      /can't be read/.test(dmgLine) && /next saved change replaces it/.test(dmgLine), `${await markOf(a)} | ${dmgLine}`);
     await click(a, 'fail'); await sleep(100);   // one change here
     const s1 = await stored();
     check('after damaged data, the next change saves the marks shown here and the warning goes',
@@ -218,6 +228,53 @@ try {
     await ev(`localStorage.removeItem(sfTestplan.key); window.dispatchEvent(new StorageEvent('storage', {key: sfTestplan.key}))`); await sleep(100);
     const lineAfter = await ev(`document.getElementById('saved').textContent`);
     check('after another tab clears the saved marks, the save line shows no stale time', !/Saved in this browser at/.test(lineAfter) && /saved in this browser/i.test(lineAfter), lineAfter);
+    await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(before))})`);
+    await load(true);
+
+    // Store format (0.2.0): format 1 reads and saves as before; a missing format counts as 1
+    check('format 1: the page saves sf-test-plan-store/1', before.format === 'sf-test-plan-store/1' && (await markOf(a)) === 'pass', before.format);
+    const noFmt = JSON.parse(JSON.stringify(before)); delete noFmt.format;
+    await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(noFmt))})`);
+    await load(true);
+    check('a saved copy with no format is read as format 1', (await markOf(a)) === 'pass' && (await noteOf(b)) === 'typed slowly' && !/newer|can't be read/.test(await ev(`document.getElementById('saved').textContent`)));
+    await click(a, 'pass'); await click(a, 'pass'); await sleep(100);   // any save
+    check('the next save of a copy with no format writes format 1', (await stored())?.format === 'sf-test-plan-store/1' && (await stored())?.checks?.[a]?.r === 'pass');
+    // a format string that isn't sf-test-plan-store/<n> is damaged data
+    await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(Object.assign({}, before, { format: 'something-else' })))})`);
+    await load(true);
+    check('a saved copy with an unknown format name counts as damaged', /can't be read/.test(await ev(`document.getElementById('saved').textContent`)) && (await markOf(a)) === '');
+
+    // a newer major format (a newer sf-test-plan) is never written over: not by a change, Import or Reset
+    const newer = JSON.stringify({ format: 'sf-test-plan-store/2', run, saved: '2040-01-01T00:00:00Z', future: { x: 1 }, checks: { [a]: { r: 'fail', n: 'from v2', at: '2040-01-01T00:00:00Z' } } });
+    const raw = () => ev(`localStorage.getItem(sfTestplan.key)`);
+    await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(newer)})`);
+    await load(true);
+    const nLine = await ev(`document.getElementById('saved').textContent`);
+    check('a page opened on a newer store format reads nothing from it, writes nothing and says why',
+      (await markOf(a)) === '' && (await raw()) === newer && /newer sf-test-plan/.test(nLine) && /Export/.test(nLine), nLine);
+    await click(b, 'pass'); await typeNote(b, 'kept in memory'); await sleep(800);
+    check('on a newer store format a change stays in memory and the saved copy is untouched',
+      (await markOf(b)) === 'pass' && (await noteOf(b)) === 'kept in memory' && (await raw()) === newer && /newer sf-test-plan/.test(await ev(`document.getElementById('saved').textContent`)));
+    const nImp = await ev(`sfTestplan.importData({format:'sf-test-plan-marks/1',run:${JSON.stringify(run)},checks:[{id:${JSON.stringify(c)},r:'skip',n:'',at:'2041-01-01T00:00:00Z',src:'page'}]})`);
+    check('Import on a newer store format merges in memory, saves nothing and says so',
+      nImp?.ok === true && (await markOf(c)) === 'skip' && (await raw()) === newer && /newer sf-test-plan/.test(nImp?.message || ''), nImp?.message);
+    const nExp = await ev(`sfTestplan.marks()`);
+    check('Export on a newer store format holds the marks shown here', nExp.checks.some((x) => x.id === b && x.r === 'pass' && x.n === 'kept in memory'));
+    await ev(`sfTestplan.reset({confirm: () => true})`); await sleep(100);
+    const nReset = await ev(`(document.getElementById('toolmsg')||{}).textContent||''`);
+    check('Reset on a newer store format clears this page only and leaves the saved copy',
+      (await markOf(b)) === '' && (await raw()) === newer && /newer sf-test-plan/.test(nReset) && !/kept\./.test(nReset), nReset);
+    // another tab writes a newer format: this tab keeps its marks and stops saving; a format 1 save from another tab ends that
+    await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(before))})`);
+    await load(true);
+    await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(newer)}); window.dispatchEvent(new StorageEvent('storage', {key: sfTestplan.key}))`); await sleep(100);
+    await click(c, 'fail'); await sleep(100);
+    check('a newer store format from another tab keeps the marks shown here and is never written over',
+      (await markOf(a)) === 'pass' && (await markOf(c)) === 'fail' && (await raw()) === newer && /newer sf-test-plan/.test(await ev(`document.getElementById('saved').textContent`)));
+    await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(before))}); window.dispatchEvent(new StorageEvent('storage', {key: sfTestplan.key}))`); await sleep(100);
+    await click(c, 'skip'); await sleep(100);
+    check("another tab's format 1 save ends the newer-format warning and saving starts again",
+      !/newer sf-test-plan/.test(await ev(`document.getElementById('saved').textContent`)) && (await stored())?.format === 'sf-test-plan-store/1' && (await stored())?.checks?.[c]?.r === 'skip');
     await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(before))})`);
     await load(true);
   }
