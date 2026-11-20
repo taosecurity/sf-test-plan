@@ -109,7 +109,7 @@ async function load(reload) {
   return false;
 }
 
-const check =(name, ok, info = '') => { console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${!ok && info ? ': ' + info : ''}`); if (!ok) fails++; };
+const check = (name, ok, info = '') => { console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${!ok && info ? ': ' + info : ''}`); if (!ok) fails++; };
 const HOSTILE = '<img src=x onerror=alert(1)>';
 const safe = (cid) => cid.replace(/[^A-Za-z0-9_-]/g, '-');
 const click = (cid, v) => ev(`document.querySelector('label[for="r-${safe(cid)}-${v}"]').click()`);
@@ -248,6 +248,11 @@ try {
     await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(Object.assign({}, before, { format: 'something-else' })))})`);
     await load(true);
     check('a saved copy with an unknown format name counts as damaged', /can't be read/.test(await ev(`document.getElementById('saved').textContent`)) && (await markOf(a)) === '');
+    for (const f of ['sf-test-plan-store/0', 'sf-test-plan-store/', 'sf-test-plan-store/garbage']) {
+      await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(Object.assign({}, before, { format: f })))})`);
+      await load(true);
+      check(`${f} counts as damaged, not newer`, /can't be read/.test(await ev(`document.getElementById('saved').textContent`)));
+    }
     // a minor or odd store version (sf-test-plan-store/1.1) counts as newer, so nothing a later version adds is dropped
     const minor = JSON.stringify(Object.assign({}, before, { format: 'sf-test-plan-store/1.1', meta: { x: 1 } }));
     await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(minor)})`);
@@ -283,13 +288,25 @@ try {
     await click(c, 'fail'); await sleep(100);
     check('a newer store format from another tab keeps the marks shown here and is never written over',
       (await markOf(a)) === 'pass' && (await markOf(c)) === 'fail' && (await raw()) === newer && /newer sf-test-plan/.test(await ev(`document.getElementById('saved').textContent`)));
-    await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(before))}); window.dispatchEvent(new StorageEvent('storage', {key: sfTestplan.key}))`); await sleep(100);
-    check("marks made here while the saved copy was newer survive another tab's format 1 save, and are saved",
-      (await markOf(c)) === 'fail' && (await stored())?.checks?.[c]?.r === 'fail' && (await markOf(a)) === 'pass', `${await markOf(c)} | ${JSON.stringify((await stored())?.checks?.[c])}`);
-    await click(c, 'skip'); await sleep(100);
-    check("another tab's format 1 save ends the newer-format warning and saving starts again",
-      !/newer sf-test-plan/.test(await ev(`document.getElementById('saved').textContent`)) && (await stored())?.format === 'sf-test-plan-store/1' && (await stored())?.checks?.[c]?.r === 'skip');
-    await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(before))})`);
+    // after finding a newer format the page stays memory-only until reload: later saves, damaged data or a clear
+    // from another tab never replace its marks, and it never writes (so nothing is merged, lost or brought back)
+    const b1 = JSON.stringify(before);
+    for (const [label, js] of [['damaged data', `localStorage.setItem(sfTestplan.key, '{not json')`],
+      ['a format 1 save', `localStorage.setItem(sfTestplan.key, ${JSON.stringify(b1)})`],
+      ['a clear', `localStorage.removeItem(sfTestplan.key)`]]) {
+      await ev(`${js}; window.dispatchEvent(new StorageEvent('storage', {key: sfTestplan.key}))`); await sleep(100);
+      const was = await raw();
+      await click(a, 'skip'); await click(a, 'pass'); await sleep(100);   // a change here
+      check(`memory-only after a newer format: ${label} from another tab keeps the marks shown here and nothing is written`,
+        (await markOf(a)) === 'pass' && (await markOf(c)) === 'fail' && (await raw()) === was && /newer sf-test-plan/.test(await ev(`document.getElementById('saved').textContent`)), `${await markOf(c)} | ${(await raw())?.slice(0, 60)}`);
+    }
+    await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(b1)})`);
+    await load(true);
+    check('a reload on format 1 marks ends memory-only mode and saving works again',
+      !/newer sf-test-plan/.test(await ev(`document.getElementById('saved').textContent`)) && (await markOf(a)) === 'pass');
+    await click(b, 'skip'); await sleep(100);
+    check('after the reload a change is saved as format 1', (await stored())?.format === 'sf-test-plan-store/1' && (await stored())?.checks?.[b]?.r === 'skip');
+    await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(b1)})`);
     await load(true);
   }
   check('reload keeps marks and notes', (await markOf(a)) === 'pass' && (await noteOf(a)) === 'first note' && (await markOf(c)) === 'pass' && (await noteOf(c)) === HOSTILE && (await noteOf(b)) === 'typed slowly' && (await liHas(a, 'is-pass')), `${await markOf(a)} ${await noteOf(a)} ${await markOf(c)}`);

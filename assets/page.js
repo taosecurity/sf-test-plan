@@ -54,17 +54,18 @@
   var others = Object.create(null);
   var lastSaved = "";   /* ISO time of the last write to storage */
   var storeDamaged = false;   /* the saved copy can't be read (found at start or after another tab's save); cleared by the next good read or save */
-  /* The saved copy is a newer major store format (from a newer sf-test-plan). This page never writes over it:
-     marks stay in memory until a read finds format 1 again or nothing saved (FORMAT.md 2). */
+  /* This page found a saved copy in a newer store format (from a newer sf-test-plan). From then until the page is
+     reloaded it reads and writes nothing: its marks live in memory only and the save line says to Export them.
+     It never takes over another tab's save in that time, so nothing is merged, lost or brought back (FORMAT.md 2). */
   var storeNewer = false;
 
-  /* Which store format a saved copy has: 1 for exactly "sf-test-plan-store/1" or no format; 2 (treated as newer,
-     never written over) for any other "sf-test-plan-store/..." name, such as /2 or /1.1, so nothing a later
-     version adds is dropped; NaN (damaged) for anything else. */
+  /* Which store format a saved copy has: 1 for exactly "sf-test-plan-store/1" or no format; 2 (newer, never
+     written over) for "sf-test-plan-store/<n>..." with n above 1, or 1 followed by more (such as /1.1), so nothing
+     a later version adds is dropped; NaN (damaged) for anything else, such as /0 or /garbage. */
   function storeMajor(data) {
     if (data.format === undefined || data.format === STORE_FORMAT) return 1;
-    if (typeof data.format === "string" && data.format.indexOf("sf-test-plan-store/") === 0) return 2;
-    return NaN;
+    var m = typeof data.format === "string" ? /^sf-test-plan-store\/(\d+)/.exec(data.format) : null;
+    return m && parseInt(m[1], 10) >= 1 ? 2 : NaN;
   }
 
   function sanitizeEntry(v) {
@@ -83,14 +84,14 @@
      format, never written over) or "unavailable" (no storage). */
   function readStore() {
     if (!storageOk) return "unavailable";
+    if (storeNewer) return "newer";   /* memory only until reload */
     var raw = null;
     try { raw = window.localStorage.getItem(KEY); } catch (e) { storageOk = false; return "unavailable"; }
-    if (!raw) { others = Object.create(null); lastSaved = ""; storeDamaged = false; storeNewer = false; return "empty"; }
+    if (!raw) { others = Object.create(null); lastSaved = ""; storeDamaged = false; return "empty"; }
     var data = null;
     try { data = JSON.parse(raw); } catch (e) { data = null; }
     var major = data && typeof data === "object" ? storeMajor(data) : NaN;
     if (major > 1) { lastSaved = ""; storeDamaged = false; storeNewer = true; return "newer"; }
-    storeNewer = false;
     if (major !== 1 || !data.checks || typeof data.checks !== "object") { lastSaved = ""; storeDamaged = true; return "damaged"; }
     others = Object.create(null);
     Object.keys(data.checks).forEach(function (id) {
@@ -133,7 +134,7 @@
       text = "Marks aren't saved in this browser: use Export before closing.";
       cls = "saved warn";
     } else if (storeNewer) {
-      text = "The saved marks in this browser come from a newer sf-test-plan, so this page leaves them as they are and doesn't save the marks shown here. Use Export to keep them, or open the plan with that newer version.";
+      text = "This page found marks saved in this browser by a newer sf-test-plan, so it leaves them as they are and doesn't save the marks shown here. Use Export to keep them, or open the plan with that newer version.";
       cls = "saved warn";
     } else if (storeDamaged) {
       text = "The saved copy in this browser can't be read. Your next saved change replaces it; use Export to keep a copy.";
@@ -603,22 +604,15 @@
     if (ev.key !== KEY && ev.key !== null) return;   /* null: all site data was cleared */
     /* Another tab saved, cleared or reset. Its save is the truth, so marks, clears and Reset carry over; only
        the note typed here and not yet written (dirty) is laid on top of its entry, and then saved. */
-    var mine = state, oursWon = false, wasNewer = storeNewer;
+    var mine = state, oursWon = false;
     state = {};
     var read = readStore();
     if (read === "damaged" || read === "newer" || read === "unavailable") {
-      /* Nothing readable to take over: keep the marks this tab shows, write nothing (so tabs never answer each
-         other's saves), and let the save line say why (sayStatus). */
+      /* Nothing readable to take over (or this page is memory-only after finding a newer format): keep the marks
+         this tab shows, write nothing (so tabs never answer each other's saves), and let the save line say why. */
       state = mine;
       sayStatus();
       return;
-    }
-    if (wasNewer) {
-      /* While the saved copy was a newer format, this tab's marks lived only in memory: merge them in (the newer
-         at wins, as in Import) and save, so they aren't lost now that saving works again. */
-      Object.keys(mine).forEach(function (id) {
-        if (hasAny(mine[id]) && (!hasAny(state[id]) || timeOf(mine[id].at) > timeOf(state[id].at))) { state[id] = mine[id]; oursWon = true; }
-      });
     }
     Object.keys(dirty).forEach(function (id) {
       var a = mine[id] || { n: "" };   /* an emptied note counts too: deleting it is the change */
