@@ -87,7 +87,7 @@ Exit codes: **0** done (warnings are fine), **1** the plan has errors (each one 
 - The tally at the top counts pass, fail, skip and not run. With a smoke test, only the smoke checks count until you mark a deep check; from then on the tally covers every check (and `import` calls the round a "Full test").
 - **Export** downloads your marks as `<run>-marks-<date>.json`. **Import** reads one back (a tester's file, or one from `sf-test-plan logs`); for each step, the newer mark wins, but a mark from the log never replaces one you made yourself.
 - **Copy results** puts a plain-text summary on the clipboard, ready to paste into a bug report or a Nexus post.
-- **Reset** clears the marks and notes on this page's steps in this browser. If another build of the plan saved marks for steps this page doesn't have, it then asks whether to clear those too.
+- **Reset** clears the marks and notes on this page's steps in this browser. Marks another build of the plan saved for steps this page doesn't have are kept, and the page says how many.
 - Marks are kept in the browser's local storage for that page. A private window, or a browser that blocks storage, keeps them only until you close the tab: the page says so, so use Export before you close it.
 
 ## Papyrus logs

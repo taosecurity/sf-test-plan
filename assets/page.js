@@ -64,15 +64,17 @@
        later log import. It is saved here and travels in exports as ns: "page" (FORMAT.md 3). */
     return { r: r, n: n, at: at, src: src, pn: v.pn === true || v.ns === "page" };
   }
+  /* Reads the saved marks into state (this page's steps) and others. If storage can't be read or holds damaged
+     data, others is left as it was, so marks this tab already holds aren't lost. */
   function readStore() {
     if (!storageOk) return;
-    others = Object.create(null);
     var raw = null;
     try { raw = window.localStorage.getItem(KEY); } catch (e) { storageOk = false; return; }
-    if (!raw) return;
+    if (!raw) { others = Object.create(null); return; }
     var data = null;
     try { data = JSON.parse(raw); } catch (e) { data = null; }
     if (!data || typeof data !== "object" || !data.checks || typeof data.checks !== "object") return;
+    others = Object.create(null);
     Object.keys(data.checks).forEach(function (id) {
       var s = sanitizeEntry(data.checks[id]);
       if (!s || !hasAny(s) || id.length > 40) return;
@@ -538,19 +540,18 @@
       say("Nothing cleared.");
       return false;
     }
-    flushNotes();      /* stop the note timers first, so none of them writes after the reset */
-    var extra = Object.keys(others).length;
-    var clearOthers = !!extra && ask("This plan also has " + extra + " saved mark" + (extra === 1 ? "" : "s") + " for steps this page doesn't have (from another build of run " + RUN + "). Clear " + (extra === 1 ? "it" : "them") + " too?");
-    /* another tab may have saved while the questions were open: read storage again, so its newest marks are the
-       ones kept, then clear this page's steps (and the others if asked) */
+    /* Another tab may have saved while the question was open. With no dialog from here on: read storage again
+       (so other builds' newest marks are the ones kept), clear this page's steps, stop the note timers (their
+       write now carries the cleared state), and save. Marks for steps this page doesn't have always stay. */
     readStore();
     state = {};
-    if (clearOthers) others = Object.create(null);
-    var kept = Object.keys(others).length;
     dirty = {};
+    flushNotes();
     paintAll(true);
     writeStore();
-    say(kept ? "Marks and notes on this page cleared; " + kept + " saved mark" + (kept === 1 ? "" : "s") + " for steps this page doesn't have kept." : "Marks and notes cleared.", "ok");
+    var kept = Object.keys(others).length;
+    if (!storageOk) say("Marks and notes on this page cleared here, but this browser isn't saving: reload may bring them back.", "warn");
+    else say("Marks and notes on this page cleared." + (kept ? " " + kept + " saved mark" + (kept === 1 ? "" : "s") + " from another build (for steps this page doesn't have) kept." : ""), "ok");
     return true;
   }
 
