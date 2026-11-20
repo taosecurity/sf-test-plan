@@ -75,6 +75,11 @@ class SecondReviewFixes(unittest.TestCase):
         self.assertEqual(from_file("Astrid.testplan.md", "Astrid test"), from_file("Astrid.testplan.md", "Astrid tests"))
         self.assertNotEqual(from_file("Astrid.testplan.md", "Astrid test"),
                             from_file("AstridRomance.testplan.md", "Astrid Romance test"))
+        # two testplan.md files in different mod folders differ by mod
+        def by_mod(mod):
+            p = parse.parse_text(f"# T\nrun: r1\nmod: {mod}\n\n## 1 G\n- [ ] one\n", path=os.path.join(mod, "testplan.md"))
+            return cfg(p)["plan"]
+        self.assertNotEqual(by_mod("ModA"), by_mod("ModB"))
 
     def test_all_smoke_group_keeps_its_intro(self):
         from sftestplan import render

@@ -59,7 +59,8 @@
     var src = v.src === "log" ? "log" : "page";
     /* pn: the note was typed by a person here (kept in this browser only, never exported), so a log mark can
        stay a log mark while the tester's note survives a later log import */
-    return { r: r, n: n, at: at, src: src, pn: v.pn === true || v.ns === "page" };
+    var t = typeof v.t === "string" ? v.t.slice(0, 300) : "";
+    return { r: r, n: n, at: at, src: src, pn: v.pn === true || v.ns === "page", t: t };
   }
   function readStore() {
     if (!storageOk) return;
@@ -72,11 +73,12 @@
     if (!data || typeof data !== "object" || !data.checks || typeof data.checks !== "object") return;
     Object.keys(data.checks).forEach(function (id) {
       var s = sanitizeEntry(data.checks[id]);
-      if (!Object.prototype.hasOwnProperty.call(byId, id)) {   /* not on this page: keep it untouched */
-        if (s && hasAny(s) && id.length <= 40) others[id] = s;
-        return;
-      }
-      if (s && hasAny(s)) state[id] = s;
+      if (!s || !hasAny(s) || id.length > 40) return;
+      /* A stored mark shows only on the step it was made for: same id and same step text. A step a rebuild
+         removed, or an id now used for a different step, keeps its mark in storage, untouched and hidden. */
+      var here = Object.prototype.hasOwnProperty.call(byId, id);
+      if (here && (!s.t || s.t === stepText(byId[id].li))) state[id] = s;
+      else others[id] = s;
     });
     if (typeof data.saved === "string") lastSaved = data.saved;
   }
@@ -84,9 +86,15 @@
   function writeStore() {
     dirty = {};
     if (!storageOk) { sayStatus(); return; }
-    var keep = {};
+    var keep = Object.create(null);
     Object.keys(others).forEach(function (id) { keep[id] = others[id]; });
-    Object.keys(state).forEach(function (id) { if (hasAny(state[id])) keep[id] = state[id]; });
+    Object.keys(state).forEach(function (id) {
+      if (!hasAny(state[id])) return;
+      var e = {}, s = state[id];
+      Object.keys(s).forEach(function (k) { e[k] = s[k]; });
+      e.t = byId[id] ? stepText(byId[id].li) : (s.t || "");   /* the step this mark was made for */
+      keep[id] = e;
+    });
     try {
       if (Object.keys(keep).length) {
         lastSaved = nowIso();
@@ -201,9 +209,7 @@
     ta.addEventListener("input", function () {
       var s = entry(id);
       s.n = ta.value.slice(0, MAX_NOTE);
-      /* a note on a log mark leaves the mark's time alone, so a newer log result can still replace the result
-         (the note stays: pn); on the tester's own entry the time moves, as for any change */
-      if (!(s.src === "log" && s.r)) s.at = nowIso();
+      s.at = nowIso();  /* any change moves the time, so Export/Import carries the note (newer wins) */
       s.pn = true;      /* a person's note; the mark keeps its own source (page or log) */
       dirty[id] = true;
       paintClasses(id);
@@ -442,7 +448,7 @@
       if (!Object.prototype.hasOwnProperty.call(byId, c.id)) { res.unknown.push(c.id.slice(0, 40)); return; }
       var r = c.r === undefined || c.r === null ? "" : c.r;
       if (r !== "" && RESULTS.indexOf(r) < 0) { res.bad++; return; }
-      var inc = sanitizeEntry({ r: r, n: c.n, at: c.at, src: c.src });
+      var inc = sanitizeEntry({ r: r, n: c.n, at: c.at, src: c.src, ns: c.ns });   /* ns: the note's source survives Export/Import */
       if (!hasAny(inc)) { res.bad++; return; }
       var cur = state[c.id];
       /* A mark from the log never replaces the tester's own mark or note: a person's Fail beats a log line. */
@@ -535,7 +541,11 @@
   function doReset(opts) {
     opts = opts || {};
     var ask = opts.confirm || function (q) { return window.confirm(q); };
-    if (!ask("Clear every mark and note on this page (run " + RUN + ")? Use Export first if you want to keep them.")) {
+    var hidden = Object.keys(others).length;
+    var q = "Clear every mark and note on this page (run " + RUN + ")" +
+      (hidden ? ", and " + hidden + " stored mark" + (hidden === 1 ? "" : "s") + " for steps this page doesn't show (from another build)" : "") +
+      "? Use Export first if you want to keep them.";
+    if (!ask(q)) {
       say("Nothing cleared.");
       return false;
     }

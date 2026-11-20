@@ -148,6 +148,22 @@ try {
 
   await click(a, 'pass'); await sleep(100);
   await load(true);
+  // a stored mark made for a different step text (a rebuild reused the id) stays hidden but is kept
+  {
+    const s0 = await stored();
+    const other = ids.find((x) => x !== a && x !== b && x !== c);
+    if (other) {
+      s0.checks[other] = { r: 'fail', n: 'old step', at: '2001-01-01T00:00:00Z', src: 'page', t: 'A step this page does not have' };
+      await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(s0))})`);
+      await load(true);
+      check('a stored mark for different step text is hidden, not shown on the new step', (await markOf(other)) === '' && (await noteOf(other)) === '');
+      await click(a, 'pass'); await click(a, 'pass'); await sleep(100);   // any save
+      check('the hidden mark stays in storage after a save', (await stored())?.checks?.[other]?.n === 'old step');
+      const s1 = await stored(); delete s1.checks[other];
+      await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(s1))})`);
+      await load(true);
+    }
+  }
   check('reload keeps marks and notes', (await markOf(a)) === 'pass' && (await noteOf(a)) === 'first note' && (await markOf(c)) === 'pass' && (await noteOf(c)) === HOSTILE && (await noteOf(b)) === 'typed slowly' && (await liHas(a, 'is-pass')), `${await markOf(a)} ${await noteOf(a)} ${await markOf(c)}`);
   check('a hostile stored note stays text after reload', (await ev(`document.querySelectorAll('img').length`)) === 0);
 
@@ -252,6 +268,17 @@ try {
   check('Reset asks first and keeps marks on no', (await markOf(a)) === 'skip');
   dialogAnswer = true; await ev(`document.querySelector('#tools button[data-act="reset"]').click()`); await sleep(100);
   check('Reset clears every mark, note and the stored copy on yes', (await ev(`document.querySelectorAll('.seg input:checked').length`)) === 0 && (await noteOf(a)) === '' && (await stored()) === null && (await openN()) === open0);
+
+  // ns: a person's note on a log mark survives Export/Import and a later, newer log import (code review, 2026-11-19)
+  {
+    const e = ids[ids.length - 1];
+    const mk = (n, at, ns) => ({ format: 'sf-test-plan-marks/1', run, title: 't', exported: at, checks: [Object.assign({ id: e, r: 'pass', n, t: '', g: 1, at, src: 'log' }, ns ? { ns } : {})] });
+    await ev(`sfTestplan.importData(${JSON.stringify(mk('my own note', '2031-01-01T00:00:00Z', 'page'))}, {confirm: () => true})`);
+    await ev(`sfTestplan.importData(${JSON.stringify(mk('Log: loaded PASS.', '2032-01-01T00:00:00Z'))}, {confirm: () => true})`);
+    check('ns: a typed note on a log mark survives Import and a newer log import', (await noteOf(e)) === 'my own note' && (await markOf(e)) === 'pass');
+    await click(e, 'pass'); await sleep(50);
+    await ev(`(()=>{const t=document.getElementById('n-${safe(e)}'); t.value=''; t.dispatchEvent(new Event('input'));})()`); await sleep(800);
+  }
 
   // A malformed address fragment must not stop the page (code review, 2026-11-19)
   // a fresh load (about:blank first, so this isn't just a fragment change in the same document)
