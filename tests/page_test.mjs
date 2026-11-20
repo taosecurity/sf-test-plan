@@ -248,10 +248,12 @@ try {
     await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(Object.assign({}, before, { format: 'something-else' })))})`);
     await load(true);
     check('a saved copy with an unknown format name counts as damaged', /can't be read/.test(await ev(`document.getElementById('saved').textContent`)) && (await markOf(a)) === '');
-    for (const f of ['sf-test-plan-store/0', 'sf-test-plan-store/', 'sf-test-plan-store/garbage']) {
-      await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(Object.assign({}, before, { format: f })))})`);
+    for (const f of ['sf-test-plan-store/0', 'sf-test-plan-store/', 'sf-test-plan-store/garbage', 'sf-test-plan-store/1 ', 'sf-test-plan-store/2garbage']) {
+      const odd = JSON.stringify(Object.assign({}, before, { format: f }));
+      await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(odd)})`);
       await load(true);
-      check(`${f} counts as damaged, not newer`, /can't be read/.test(await ev(`document.getElementById('saved').textContent`)));
+      check(`"${f}" counts as damaged, not newer: nothing loaded or written`,
+        /can't be read/.test(await ev(`document.getElementById('saved').textContent`)) && (await markOf(a)) === '' && (await ev(`localStorage.getItem(sfTestplan.key)`)) === odd);
     }
     // a minor or odd store version (sf-test-plan-store/1.1) counts as newer, so nothing a later version adds is dropped
     const minor = JSON.stringify(Object.assign({}, before, { format: 'sf-test-plan-store/1.1', meta: { x: 1 } }));

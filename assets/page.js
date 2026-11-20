@@ -64,7 +64,7 @@
      a later version adds is dropped; NaN (damaged) for anything else, such as /0 or /garbage. */
   function storeMajor(data) {
     if (data.format === undefined || data.format === STORE_FORMAT) return 1;
-    var m = typeof data.format === "string" ? /^sf-test-plan-store\/(\d+)/.exec(data.format) : null;
+    var m = typeof data.format === "string" ? /^sf-test-plan-store\/(\d+)(\.\d+)*$/.exec(data.format) : null;
     return m && parseInt(m[1], 10) >= 1 ? 2 : NaN;
   }
 
@@ -80,8 +80,9 @@
   }
   /* Reads the saved marks into state (this page's steps) and others. If storage can't be read or holds damaged
      or newer-format data, others is left as it was, so marks this tab already holds aren't lost.
-     Returns "ok", "empty" (nothing saved), "damaged" (saved data can't be read), "newer" (a newer major store
-     format, never written over) or "unavailable" (no storage). */
+     Returns "ok", "empty" (nothing saved), "damaged" (saved data can't be read), "newer" (this page found a
+     newer store format, now or earlier, and is memory-only until reload: storage isn't read again and nothing is
+     written, so this says nothing about what storage holds now) or "unavailable" (no storage). */
   function readStore() {
     if (!storageOk) return "unavailable";
     if (storeNewer) return "newer";   /* memory only until reload */
@@ -489,7 +490,7 @@
     if (res.kept) parts.push(res.kept + " kept as they were, because the marks here are newer or are your own (a log mark never replaces them).");
     if (res.unknown.length) parts.push(res.unknown.length + " not on this page and not added: " + res.unknown.slice(0, 12).join(", ") + (res.unknown.length > 12 ? ", ..." : "") + ".");
     if (res.bad) parts.push(res.bad + " skipped because they were damaged or empty.");
-    if (storeNewer) parts.push("They aren't saved in this browser, because its saved marks come from a newer sf-test-plan; use Export to keep them.");
+    if (storeNewer) parts.push("They aren't saved, because this page found marks saved by a newer sf-test-plan and saves nothing until it is reloaded; use Export to keep them.");
     res.message = parts.join(" ");
     return res;
   }
@@ -580,7 +581,7 @@
     writeStore();
     var kept = Object.keys(others).length;
     if (!storageOk) say("Marks and notes on this page cleared here, but this browser isn't saving: reload may bring them back.", "warn");
-    else if (read === "newer") say("Marks and notes on this page cleared. The saved marks in this browser come from a newer sf-test-plan, so they were left as they are.", "warn");
+    else if (read === "newer") say("Marks and notes on this page cleared here only. This page found marks saved by a newer sf-test-plan, so it saves nothing until it is reloaded.", "warn");
     else if (read === "damaged") say("Marks and notes on this page cleared. The saved copy in this browser couldn't be read, so it was replaced; Import an Export to bring back marks from other builds.", "warn");
     else say("Marks and notes on this page cleared." + (kept ? " " + kept + " saved mark" + (kept === 1 ? "" : "s") + " from another build (for steps this page doesn't have) kept." : ""), "ok");
     return true;
