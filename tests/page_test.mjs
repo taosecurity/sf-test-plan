@@ -177,9 +177,9 @@ try {
     await ev(`localStorage.setItem(sfTestplan.key, '{not json'); window.dispatchEvent(new StorageEvent('storage', {key: sfTestplan.key}))`); await sleep(100);
     // (a same-tab StorageEvent: the test doesn't cover two real tabs racing)
     const dmgLine = await ev(`document.getElementById('saved').textContent`);
-    check("damaged data from another tab keeps the marks shown here, writes nothing and the save line says they aren't saved yet",
+    check("damaged data from another tab keeps the marks shown here, writes nothing and the save line says the next change replaces the unreadable copy",
       (await markOf(a)) === 'pass' && (await noteOf(a)) === 'first note' && (await ev(`localStorage.getItem(sfTestplan.key)`)) === '{not json' &&
-      /can't read/.test(dmgLine) && /aren't saved yet/.test(dmgLine), `${await markOf(a)} | ${dmgLine}`);
+      /can't be read/.test(dmgLine) && /next change replaces it/.test(dmgLine), `${await markOf(a)} | ${dmgLine}`);
     await click(a, 'fail'); await sleep(100);   // one change here
     const s1 = await stored();
     check('after damaged data, the next change saves the marks shown here and the warning goes',
@@ -187,10 +187,11 @@ try {
     // a page opened on damaged data warns too, and another tab's good save clears the warning
     await ev(`localStorage.setItem(sfTestplan.key, '{not json')`);
     await load(true);
-    check('a page opened on damaged saved data warns in the save line', /can't read/.test(await ev(`document.getElementById('saved').textContent`)));
+    check('a page opened on damaged saved data warns in the save line and writes nothing',
+      /can't be read/.test(await ev(`document.getElementById('saved').textContent`)) && (await ev(`localStorage.getItem(sfTestplan.key)`)) === '{not json');
     await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(before))}); window.dispatchEvent(new StorageEvent('storage', {key: sfTestplan.key}))`); await sleep(100);
     const goodLine = await ev(`document.getElementById('saved').textContent`);
-    check("another tab's good save clears the damaged-data warning", !/can't read/.test(goodLine) && (await markOf(a)) === 'pass', goodLine);
+    check("another tab's good save clears the damaged-data warning", !/can't be read/.test(goodLine) && (await markOf(a)) === 'pass', goodLine);
     await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(before))})`);
     await load(true);
     // another tab removes the saved marks: the save line drops the old "Saved at" time

@@ -53,7 +53,7 @@
      number; a new build that changes its steps should get a new run: (README, FORMAT.md 2). */
   var others = Object.create(null);
   var lastSaved = "";   /* ISO time of the last write to storage */
-  var storeDamaged = false;   /* another tab left saved data this page can't read; cleared by the next good read or save */
+  var storeDamaged = false;   /* the saved copy can't be read (found at start or after another tab's save); cleared by the next good read or save */
 
   function sanitizeEntry(v) {
     if (!v || typeof v !== "object") return null;
@@ -117,7 +117,7 @@
       text = "Marks aren't saved in this browser: use Export before closing.";
       cls = "saved warn";
     } else if (storeDamaged) {
-      text = "Another tab left saved marks this page can't read, so the marks shown here aren't saved yet: they are saved with your next change, or use Export.";
+      text = "The saved copy in this browser can't be read. Your next change replaces it with the marks shown here; use Export to keep a copy.";
       cls = "saved warn";
     } else if (lastSaved) {
       text = "Saved in this browser at " + localStamp(new Date(timeOf(lastSaved))) + ".";
