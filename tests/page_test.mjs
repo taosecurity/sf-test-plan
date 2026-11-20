@@ -248,20 +248,24 @@ try {
     await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(Object.assign({}, before, { format: 'something-else' })))})`);
     await load(true);
     check('a saved copy with an unknown format name counts as damaged', /can't be read/.test(await ev(`document.getElementById('saved').textContent`)) && (await markOf(a)) === '');
-    for (const f of ['sf-test-plan-store/0', 'sf-test-plan-store/', 'sf-test-plan-store/garbage', 'sf-test-plan-store/1 ', 'sf-test-plan-store/2garbage']) {
-      const odd = JSON.stringify(Object.assign({}, before, { format: f }));
+    // no version number of 1 or more: damaged, nothing loaded, and the next change replaces it with format 1
+    for (const f of ['sf-test-plan-store/0', 'sf-test-plan-store/', 'sf-test-plan-store/garbage']) {
+      await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(Object.assign({}, before, { format: f })))})`);
+      await load(true);
+      const ok1 = /can't be read/.test(await ev(`document.getElementById('saved').textContent`)) && (await markOf(a)) === '';
+      await click(b, 'skip'); await sleep(100);
+      check(`"${f}" counts as damaged: nothing loaded, and the next change replaces it with format 1`,
+        ok1 && (await stored())?.format === 'sf-test-plan-store/1' && (await stored())?.checks?.[b]?.r === 'skip');
+    }
+    // any other name with a version number of 1 or more counts as newer and is never written over, even after a change
+    for (const f of ['sf-test-plan-store/1.1', 'sf-test-plan-store/1.0', 'sf-test-plan-store/2-rc', 'sf-test-plan-store/1 ', 'sf-test-plan-store/2garbage']) {
+      const odd = JSON.stringify(Object.assign({}, before, { format: f, meta: { x: 1 } }));
       await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(odd)})`);
       await load(true);
-      check(`"${f}" counts as damaged, not newer: nothing loaded or written`,
-        /can't be read/.test(await ev(`document.getElementById('saved').textContent`)) && (await markOf(a)) === '' && (await ev(`localStorage.getItem(sfTestplan.key)`)) === odd);
+      await click(b, 'skip'); await sleep(100);
+      check(`"${f}" counts as newer and is never written over`,
+        (await ev(`localStorage.getItem(sfTestplan.key)`)) === odd && (await markOf(a)) === '' && /newer sf-test-plan/.test(await ev(`document.getElementById('saved').textContent`)));
     }
-    // a minor or odd store version (sf-test-plan-store/1.1) counts as newer, so nothing a later version adds is dropped
-    const minor = JSON.stringify(Object.assign({}, before, { format: 'sf-test-plan-store/1.1', meta: { x: 1 } }));
-    await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(minor)})`);
-    await load(true);
-    await click(b, 'skip'); await sleep(100);
-    check('sf-test-plan-store/1.1 counts as newer and is never written over',
-      (await ev(`localStorage.getItem(sfTestplan.key)`)) === minor && /newer sf-test-plan/.test(await ev(`document.getElementById('saved').textContent`)));
 
     // a newer major format (a newer sf-test-plan) is never written over: not by a change, Import or Reset
     const newer = JSON.stringify({ format: 'sf-test-plan-store/2', run, saved: '2040-01-01T00:00:00Z', future: { x: 1 }, checks: { [a]: { r: 'fail', n: 'from v2', at: '2040-01-01T00:00:00Z' } } });

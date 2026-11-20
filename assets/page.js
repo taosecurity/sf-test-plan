@@ -60,11 +60,12 @@
   var storeNewer = false;
 
   /* Which store format a saved copy has: 1 for exactly "sf-test-plan-store/1" or no format; 2 (newer, never
-     written over) for "sf-test-plan-store/<n>..." with n above 1, or 1 followed by more (such as /1.1), so nothing
-     a later version adds is dropped; NaN (damaged) for anything else, such as /0 or /garbage. */
+     written over) for any other name that starts "sf-test-plan-store/<n>" with n of 1 or more, whatever follows
+     (/2, /1.1, /1.0, /2-rc, even /1 with a trailing space); NaN (damaged, replaced by the next save) only when there
+     is no such number (/0, /, /garbage). Settled rule: err toward never writing over (NOTES 0.2.0). */
   function storeMajor(data) {
     if (data.format === undefined || data.format === STORE_FORMAT) return 1;
-    var m = typeof data.format === "string" ? /^sf-test-plan-store\/(\d+)(\.\d+)*$/.exec(data.format) : null;
+    var m = typeof data.format === "string" ? /^sf-test-plan-store\/(\d+)/.exec(data.format) : null;
     return m && parseInt(m[1], 10) >= 1 ? 2 : NaN;
   }
 
