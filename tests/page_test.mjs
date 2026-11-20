@@ -107,7 +107,8 @@ try {
 
   const KEY = await ev(`sfTestplan.key`);
   const run = await ev(`JSON.parse(document.getElementById('tp-config').textContent).run`);
-  check('storage key is sf-test-plan:<run>', KEY === `sf-test-plan:${run}`, KEY);
+  const planId = await ev(`JSON.parse(document.getElementById('tp-config').textContent).plan || ''`);
+  check('storage key is sf-test-plan:<run>[:<plan>]', KEY === `sf-test-plan:${run}` + (planId ? `:${planId}` : ''), KEY);
   const ids = await ev(`[...document.querySelectorAll('li.check')].map(li=>li.getAttribute('data-id'))`);
   const hasSmoke = await ev(`!!document.getElementById('smoke')`);
   const smokeIds = await ev(`[...document.querySelectorAll('#smoke li.check')].map(li=>li.getAttribute('data-id'))`);
@@ -189,6 +190,8 @@ try {
       { id: d, r: 'pass', n: HOSTILE, t: HOSTILE, g: 2, at: '2030-01-01T00:00:00Z', src: 'log' },
       { id: '999.999', r: 'pass', n: '', t: 'not here', g: 999, at: '2030-01-01T00:00:00Z', src: 'page' },
       { id: HOSTILE, r: 'fail', n: '', t: '', g: 9, at: '2030-01-01T00:00:00Z', src: 'page' },
+      { id: c, r: 'fail', n: 'from the log', t: '', g: 1, at: '2030-01-01T00:00:00Z', src: 'log' },
+      { id: '__proto__', r: 'pass', n: '', t: '', g: 1, at: '2030-01-01T00:00:00Z', src: 'page' },
     ],
   };
   const impPath = join(work, 'import.json'); writeFileSync(impPath, JSON.stringify(imp));
@@ -196,6 +199,8 @@ try {
   const m1 = await msg();
   check('import: the newer mark from the file wins', (await markOf(a)) === 'skip' && (await noteOf(a)) === 'newer from file');
   check('import: a newer mark on the page is kept', (await markOf(b)) === 'fail' && (await noteOf(b)) === 'typed slowly');
+  check('import: a newer log mark never replaces the tester\'s own mark', (await markOf(c)) === 'pass' && (await noteOf(c)) === HOSTILE);
+  check('import: an id like __proto__ is reported as unknown', m1.includes('__proto__'), m1);
   check('import: unknown ids are reported, not added', /not on this page/.test(m1) && m1.includes('999.999') && (await ev(`!!document.querySelector('li.check[data-id="999.999"]')`)) === false, m1);
   check('import: a log mark shows "Checked from the log"', (await markOf(d)) === 'pass' && (await liHas(d, 'from-log')) && (await ev(`(document.querySelector('li.check[data-id="${d}"] .logbadge')||{}).textContent`)) === 'Checked from the log');
   check('import: hostile text stays text', (await noteOf(d)) === HOSTILE && m1.includes(HOSTILE) && (await ev(`document.querySelectorAll('img').length`)) === 0);

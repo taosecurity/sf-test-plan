@@ -87,6 +87,7 @@ details.deep > section + section{margin-top:22px}
 .check .id{font:500 12px var(--f-mono); color:var(--muted)}
 .check .expect{color:var(--muted); font-size:15px}
 .check .hint{color:var(--muted); font-size:14px; font-style:italic}
+.check .group-intro{color:var(--muted); font-size:14px; border-left:2px solid var(--line); padding-left:8px; margin-bottom:4px}
 .check .bylog{color:var(--muted); font-size:13px; border-left:2px solid var(--line); padding-left:8px}
 .check .from{color:var(--muted); font-size:12px}
 /* State classes the page script sets on li.check: is-pass, is-fail, is-skip, is-open, has-note, from-log. */

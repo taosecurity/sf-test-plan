@@ -92,7 +92,9 @@ Exit codes for `check` and `build`: 0 = no errors (warnings allowed), 1 = errors
 - Smoke checks inside `<section id="smoke">`, the rest inside `<details id="deep">` when smoke is set; otherwise groups are `<section class="group" id="g<n>">`.
 - `<code class="cmd">` on spans that match the command pattern (the script adds the Copy button).
 
-The page saves marks in `localStorage` under `sf-test-plan:<run>`. If storage throws, it keeps marks in memory and says so in `#saved`.
+The page saves marks in `localStorage` under `sf-test-plan:<run>:<plan>`, where `<plan>` is the `plan` value in tp-config: the first 12 hex digits of the SHA-256 of `title`, `mod` and `run` joined with newlines. Browsers share one storage area for every `file://` page, so this keeps two plans with the same `run` apart, while copies of the same plan (same title, mod and run) share marks. If storage throws, the page keeps marks in memory and says so in `#saved`. When another tab of the same page saves, this page takes that save (so clears and Reset carry over) and keeps only a note typed here that wasn't saved yet.
+
+Import merges by id: the newer `at` wins, except that a mark with `src: "log"` never replaces a mark or note the tester made on the page.
 
 ## 3. Marks file (`marks.json`)
 
@@ -136,5 +138,5 @@ Written next to the plan by `import`. Newest round first. `build` shows it as th
 `sf-test-plan logs` reads the JSON report papyrus-log-check (0.3.0 or later) writes: a `mods` list, each with `mod`, `status` and `rules`, each rule with `kind`, `id` and `status` (`PASS`, `FAIL`, `NOT SEEN`). It uses the `mods` entry whose `mod` equals the plan's `mod:` key (case-insensitive), or the one named by `--mod`, or the only entry; otherwise it stops with exit 2 and lists the mods in the report. If that entry's status is `NOT LOADED`, it writes no marks and says so (exit 0). For a `forbid` rule, PASS means the forbidden line never appeared. For each check with `log:` ids:
 - every listed rule PASS gives `r: pass`;
 - any listed rule FAIL gives `r: fail`, with the rule ids and status in `n`;
-- otherwise no mark, and `n` says which rule wasn't seen.
+- otherwise the check gets no entry in the marks file (an empty entry could replace a tester's mark), and the command's printed lines say which rule wasn't seen.
 Marks it writes have `src: "log"`.

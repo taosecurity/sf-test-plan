@@ -2,6 +2,7 @@
 The page's CSS and script come from ../assets/page.css and ../assets/page.js (C2) and are inlined."""
 from __future__ import annotations
 
+import hashlib
 import html as _html
 import json
 import logging
@@ -16,7 +17,7 @@ log = logging.getLogger("sf-test-plan")
 ASSETS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets")
 
 _CODE_RE = re.compile(r"`([^`]+)`")
-_LINK_RE = re.compile(r"\[([^\[\]]+)\]\((https?://[^\s()<>\"]+)\)")
+_LINK_RE = re.compile(r"\[([^\[\]]+)\]\((https?://[^\s()<>\"\x00]+)\)")  # \x00: a code span can't sit inside a URL
 _BOLD_RE = re.compile(r"\*\*(?=\S)(.+?)(?<=\S)\*\*")
 _ITALIC_RE = re.compile(r"(?<![\w*])\*(?=[^\s*])(.+?)(?<=[^\s*])\*(?![\w*])")
 _SLOT_RE = re.compile(r"\x00(\d+)\x00")
@@ -144,8 +145,10 @@ def render(plan: Plan, results: list[dict] | None = None) -> str:
     smoke = plan.smoke()
     total = len(smoke) if smoke else len(checks)
     rows = [r for r in (results or []) if isinstance(r, dict)]
+    # browsers share one storage area for all file:// pages, so the page's storage key also names the plan
+    plan_id = hashlib.sha256(f"{title}\n{plan.mod}\n{plan.run}".encode("utf-8")).hexdigest()[:12]
     config = {"format": model.PAGE_FORMAT, "run": plan.run, "title": title, "tool": model.TOOL_ID,
-              "mod": plan.mod, "version": plan.version, "zip": plan.zip, "total": total}
+              "mod": plan.mod, "version": plan.version, "zip": plan.zip, "total": total, "plan": plan_id}
 
     out = ["<!doctype html>", '<html lang="en">', "<head>", '<meta charset="utf-8">',
            '<meta name="viewport" content="width=device-width, initial-scale=1">',
@@ -208,7 +211,18 @@ def render(plan: Plan, results: list[dict] | None = None) -> str:
                 f'  <h2><span class="n">S</span> Smoke test ({n} check{"s" if n != 1 else ""})</h2>',
                 '  <p class="muted">Do these in this order. Each one keeps its number from its group.</p>',
                 '  <ul class="checks">']
-        out += [_check_li(c, groups, True) for c in smoke]
+        # a group whose checks are all in the smoke test has no deep section, so its introduction goes with its
+        # first smoke check (code review, 2026-11-19)
+        shown: set[int] = set()
+        for c in smoke:
+            li = _check_li(c, groups, True)
+            g = groups.get(c.group)
+            if g and g.intro and c.group not in shown and all(x.smoke for x in g.checks):
+                intro = "".join(f'<div class="group-intro">{inline(p)}</div>'
+                                for p in re.split(r"\n\s*\n", g.intro) if p.strip())
+                li = li.replace('<div class="what">', '<div class="what">' + intro, 1)
+            shown.add(c.group)
+            out.append(li)
         out += ["  </ul>", "</section>"]
         rest = len(checks) - n
         if rest:

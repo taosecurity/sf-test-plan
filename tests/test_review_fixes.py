@@ -51,6 +51,39 @@ class ParserFixes(unittest.TestCase):
         self.assertEqual((c.step, c.log), ("one", ["a", "b"]))
 
 
+class SecondReviewFixes(unittest.TestCase):
+    """The public-commit /code-review (medium), 2026-11-19."""
+
+    def test_plan_id_in_config_names_the_plan(self):
+        from sftestplan import render
+        a = parse.parse_text("# A\nrun: r1\n\n## 1 G\n- [ ] one\n")
+        b = parse.parse_text("# B\nrun: r1\n\n## 1 G\n- [ ] one\n")
+
+        def cfg(p):
+            h = render.render(p)
+            s = h.index('id="tp-config">') + len('id="tp-config">')
+            return json.loads(h[s:h.index("</script>", s)])
+        ca, cb = cfg(a), cfg(b)
+        self.assertRegex(ca["plan"], r"^[0-9a-f]{12}$")
+        self.assertNotEqual(ca["plan"], cb["plan"])          # same run, different plans: different storage keys
+        self.assertEqual(ca["plan"], cfg(parse.parse_text("# A\nrun: r1\n\n## 1 G\n- [ ] one\n- [ ] two\n"))["plan"])
+
+    def test_all_smoke_group_keeps_its_intro(self):
+        from sftestplan import render
+        p = parse.parse_text("# T\nrun: a\n\n## 1 G\n- [ ] one\n  smoke: yes\n- [ ] two\n\n"
+                             "## 3 Save and load\nUse a save made before installing the mod.\n\n- [ ] Load it.\n  smoke: yes\n")
+        h = render.render(p)
+        self.assertIn("Use a save made before installing the mod.", h)
+        self.assertIn('class="group-intro"', h)
+
+    def test_cr_only_line_numbers_after_a_comment(self):
+        text = "# T\nrun: a\n\n<!-- two\nlines -->\n## 1 G\n- [ ] one\n## 1 Again\n- [ ] two\n"
+        want = [(x.code, x.line) for x in parse.parse_text(text).problems]
+        got = [(x.code, x.line) for x in parse.parse_text(text.replace("\n", "\r")).problems]
+        self.assertEqual(got, want)
+        self.assertIn(("dup-group", 8), got)
+
+
 class CliFixes(unittest.TestCase):
     def test_non_ascii_output_through_a_pipe(self):
         with tempfile.TemporaryDirectory() as d:

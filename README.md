@@ -85,7 +85,7 @@ Exit codes: **0** done (warnings are fine), **1** the plan has errors (each one 
 
 - **Pass / Fail / Skip** on each step, and a note box. Click a chosen mark again to clear it.
 - The tally at the top counts pass, fail, skip and not run. With a smoke test, only the smoke checks count until you mark a deep check; from then on the tally covers every check (and `import` calls the round a "Full test").
-- **Export** downloads your marks as `<run>-marks-<date>.json`. **Import** reads one back (a tester's file, or one from `sf-test-plan logs`); for each step, the newer mark wins.
+- **Export** downloads your marks as `<run>-marks-<date>.json`. **Import** reads one back (a tester's file, or one from `sf-test-plan logs`); for each step, the newer mark wins, but a mark from the log never replaces one you made yourself.
 - **Copy results** puts a plain-text summary on the clipboard, ready to paste into a bug report or a Nexus post.
 - **Reset** clears this round's marks in this browser.
 - Marks are kept in the browser's local storage for that page. A private window, or a browser that blocks storage, keeps them only until you close the tab: the page says so, so use Export before you close it.
@@ -106,7 +106,7 @@ Steps whose `log:` rules all passed are marked Pass; any failed rule marks the s
 - Run the command again with `--verbose` to see what was read and decided, or `--log sf-test-plan.log` to save the same details to a file. The log names the plan, each group and step it read, each warning and why, and the files it wrote. Attach it when you report a problem.
 - **"run ... isn't allowed"**: use only letters, digits, `.`, `_` and `-` in `run:`.
 - **Marks are gone**: the page's `run:` changed (a new round starts empty: import the old marks file if you need them), or the browser cleared its site data.
-- **The page opened from a different folder has no marks**: browsers keep marks per file location. Export on one, Import on the other.
+- **Marks are per browser and per plan**: a browser keeps marks for a plan by its title, mod and `run:`, so copies of the same page in that browser share marks, while another browser or computer starts empty. Export on one, Import on the other.
 
 ## Background
 

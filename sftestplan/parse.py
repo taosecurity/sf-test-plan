@@ -29,6 +29,7 @@ def _lines(text: str) -> tuple[list[tuple[int, str, bool]], int]:
     if text.startswith("﻿"):
         text = text[1:]
     text = text.replace(_MARK, "")
+    text = text.replace("\r\n", "\n").replace("\r", "\n")   # one line-break form, so comment line counts are right
     unclosed: list[int] = []
 
     def cut(m: re.Match) -> str:

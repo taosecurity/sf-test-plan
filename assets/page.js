@@ -18,7 +18,10 @@
   var RUN = typeof CFG.run === "string" && CFG.run ? CFG.run : "plan";
   var TITLE = typeof CFG.title === "string" ? CFG.title : document.title;
   var TOOL = typeof CFG.tool === "string" ? CFG.tool : "sf-test-plan";
-  var KEY = "sf-test-plan:" + RUN;
+  /* Browsers share one storage area for every file:// page, so the key names the plan as well as the run
+     (CFG.plan: a short hash of the title, mod and run made at build time). */
+  var PLAN = typeof CFG.plan === "string" && /^[0-9a-f]{1,32}$/.test(CFG.plan) ? CFG.plan : "";
+  var KEY = "sf-test-plan:" + RUN + (PLAN ? ":" + PLAN : "");
 
   /* ---------- small helpers ---------- */
   function $(id) { return document.getElementById(id); }
@@ -69,7 +72,9 @@
     });
     if (typeof data.saved === "string") lastSaved = data.saved;
   }
+  var dirty = {};   /* ids changed here and not yet written (a note waiting for its pause) */
   function writeStore() {
+    dirty = {};
     if (!storageOk) { sayStatus(); return; }
     var keep = {};
     Object.keys(state).forEach(function (id) { if (hasAny(state[id])) keep[id] = state[id]; });
@@ -188,6 +193,8 @@
       var s = entry(id);
       s.n = ta.value.slice(0, MAX_NOTE);
       s.at = nowIso();
+      s.src = "page";   /* a person edited it, so it is no longer "from the log" */
+      dirty[id] = true;
       paintClasses(id);
       clearTimeout(timer);
       timer = setTimeout(function () { timer = null; writeStore(); }, NOTE_DELAY);
@@ -419,12 +426,14 @@
     }
     data.checks.forEach(function (c) {
       if (!c || typeof c !== "object" || typeof c.id !== "string") { res.bad++; return; }
-      if (!byId[c.id]) { res.unknown.push(c.id.slice(0, 40)); return; }
+      if (!Object.prototype.hasOwnProperty.call(byId, c.id)) { res.unknown.push(c.id.slice(0, 40)); return; }
       var r = c.r === undefined || c.r === null ? "" : c.r;
       if (r !== "" && RESULTS.indexOf(r) < 0) { res.bad++; return; }
       var inc = sanitizeEntry({ r: r, n: c.n, at: c.at, src: c.src });
       if (!hasAny(inc)) { res.bad++; return; }
       var cur = state[c.id];
+      /* A mark from the log never replaces the tester's own mark or note: a person's Fail beats a log line. */
+      if (inc.src === "log" && hasAny(cur) && cur.src !== "log") { res.kept++; return; }
       if (hasAny(cur) && !(timeOf(inc.at) > timeOf(cur.at))) { res.kept++; return; }
       state[c.id] = inc;
       res.added++;
@@ -433,7 +442,7 @@
     paintAll(true);
     writeStore();
     var parts = ["Imported " + res.added + (res.added === 1 ? " check" : " checks") + "."];
-    if (res.kept) parts.push(res.kept + " kept as they were, because the marks here are newer.");
+    if (res.kept) parts.push(res.kept + " kept as they were, because the marks here are newer or are your own (a log mark never replaces them).");
     if (res.unknown.length) parts.push(res.unknown.length + " not on this page and not added: " + res.unknown.slice(0, 12).join(", ") + (res.unknown.length > 12 ? ", ..." : "") + ".");
     if (res.bad) parts.push(res.bad + " skipped because they were damaged or empty.");
     res.message = parts.join(" ");
@@ -539,19 +548,30 @@
   /* Another tab with the same page changed the marks. */
   window.addEventListener("storage", function (ev) {
     if (ev.key !== KEY) return;
-    /* Another tab saved. Take its marks, but keep this tab's own entries where they are newer (such as a note
-       typed here that hasn't been saved yet), then save the merge if anything of ours won. */
+    /* Another tab saved, cleared or reset. Its save is the truth, so clears and Reset carry over; only a note
+       typed here and not yet written (dirty) is kept on top of it, and then saved. */
     var mine = state, oursWon = false;
     state = {};
     readStore();
-    Object.keys(mine).forEach(function (id) {
-      var a = mine[id], b = state[id];
-      if (!b || (a.at || "") > (b.at || "")) { state[id] = a; oursWon = true; }
+    Object.keys(dirty).forEach(function (id) {
+      if (mine[id]) { state[id] = mine[id]; oursWon = true; }
     });
     paintAll(false);
     if (oursWon) writeStore();
     sayStatus();
   });
+
+  /* A link to #deep (or to anything inside it) opens the folded Deep checks box. */
+  function openDeepFor(hash) {
+    var d = $("deep"), t = hash && hash.length > 1 ? document.getElementById(decodeURIComponent(hash.slice(1))) : null;
+    if (d && t && (t === d || d.contains(t))) d.open = true;
+  }
+  window.addEventListener("hashchange", function () { openDeepFor(location.hash); });
+  document.addEventListener("click", function (ev) {
+    var a = ev.target && ev.target.closest ? ev.target.closest('a[href^="#"]') : null;
+    if (a) openDeepFor(a.getAttribute("href"));
+  });
+  openDeepFor(location.hash);
 
   /* ---------- start ---------- */
   readStore();
