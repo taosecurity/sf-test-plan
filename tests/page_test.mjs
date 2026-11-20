@@ -48,12 +48,16 @@ const startTimer = setTimeout(() => {
   finish(2);
 }, waitSecs * 1000);
 while (!targets.some((t) => t.type === 'page')) {
-  try { const list = await (await fetch(`http://127.0.0.1:${port}/json`)).json(); if (Array.isArray(list)) targets = list; } catch { }
+  // a stalled reply is dropped after 5 s and asked again; the start timer is the only hard limit
+  try { const list = await (await fetch(`http://127.0.0.1:${port}/json`, { signal: AbortSignal.timeout(5000) })).json(); if (Array.isArray(list)) targets = list; } catch { }
   await sleep(200);
 }
 const target = targets.find((t) => t.type === 'page');
 const ws = new WebSocket(target.webSocketDebuggerUrl);
-await new Promise((r) => ws.addEventListener('open', r));
+await new Promise((r) => {
+  ws.addEventListener('open', r);
+  ws.addEventListener('error', () => { console.log(`Chrome listed the page on port ${port} but the connection to it failed. Close other headless Chrome windows using the profile, or set TP_CDP_PORT.`); finish(2); });
+});
 clearTimeout(startTimer);
 
 let seq = 0; const waits = {}; const errors = []; const dialogs = []; let dialogAnswer = true;
