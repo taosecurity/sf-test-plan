@@ -75,7 +75,7 @@
     if (!raw) { others = Object.create(null); lastSaved = ""; storeDamaged = false; return "empty"; }
     var data = null;
     try { data = JSON.parse(raw); } catch (e) { data = null; }
-    if (!data || typeof data !== "object" || !data.checks || typeof data.checks !== "object") return "damaged";
+    if (!data || typeof data !== "object" || !data.checks || typeof data.checks !== "object") { lastSaved = ""; storeDamaged = true; return "damaged"; }
     others = Object.create(null);
     Object.keys(data.checks).forEach(function (id) {
       var s = sanitizeEntry(data.checks[id]);
@@ -589,7 +589,6 @@
       /* Nothing readable to take over: keep the marks this tab shows, write nothing (so tabs never answer each
          other's saves), and say plainly that they aren't saved until the next change here. */
       state = mine;
-      if (read === "damaged") { lastSaved = ""; storeDamaged = true; }
       sayStatus();
       return;
     }

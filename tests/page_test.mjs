@@ -180,10 +180,17 @@ try {
     check("damaged data from another tab keeps the marks shown here, writes nothing and the save line says they aren't saved yet",
       (await markOf(a)) === 'pass' && (await noteOf(a)) === 'first note' && (await ev(`localStorage.getItem(sfTestplan.key)`)) === '{not json' &&
       /can't read/.test(dmgLine) && /aren't saved yet/.test(dmgLine), `${await markOf(a)} | ${dmgLine}`);
-    await click(a, 'pass'); await click(a, 'pass'); await sleep(100);   // the next change here
+    await click(a, 'fail'); await sleep(100);   // one change here
     const s1 = await stored();
     check('after damaged data, the next change saves the marks shown here and the warning goes',
-      s1?.checks?.[a]?.r === 'pass' && s1?.checks?.[a]?.n === 'first note' && /Saved in this browser at/.test(await ev(`document.getElementById('saved').textContent`)), JSON.stringify(s1)?.slice(0, 200));
+      s1?.checks?.[a]?.r === 'fail' && s1?.checks?.[a]?.n === 'first note' && /Saved in this browser at/.test(await ev(`document.getElementById('saved').textContent`)), JSON.stringify(s1)?.slice(0, 200));
+    // a page opened on damaged data warns too, and another tab's good save clears the warning
+    await ev(`localStorage.setItem(sfTestplan.key, '{not json')`);
+    await load(true);
+    check('a page opened on damaged saved data warns in the save line', /can't read/.test(await ev(`document.getElementById('saved').textContent`)));
+    await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(before))}); window.dispatchEvent(new StorageEvent('storage', {key: sfTestplan.key}))`); await sleep(100);
+    const goodLine = await ev(`document.getElementById('saved').textContent`);
+    check("another tab's good save clears the damaged-data warning", !/can't read/.test(goodLine) && (await markOf(a)) === 'pass', goodLine);
     await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(before))})`);
     await load(true);
     // another tab removes the saved marks: the save line drops the old "Saved at" time
