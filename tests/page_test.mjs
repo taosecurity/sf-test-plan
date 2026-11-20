@@ -54,10 +54,16 @@ while (!targets.some((t) => t.type === 'page')) {
 }
 const target = targets.find((t) => t.type === 'page');
 const ws = new WebSocket(target.webSocketDebuggerUrl);
-await new Promise((r) => {
-  ws.addEventListener('open', r);
-  ws.addEventListener('error', () => { console.log(`Chrome listed the page on port ${port} but the connection to it failed. Close other headless Chrome windows using the profile, or set TP_CDP_PORT.`); finish(2); });
-});
+let connected = false;
+const failedToConnect = () => {   // only while connecting: later errors are not start-up failures
+  if (connected) return;
+  console.log(`Chrome listed the page on port ${port} but the connection to it failed. Close other headless Chrome windows using the profile, or set TP_CDP_PORT.`);
+  finish(2);
+};
+ws.addEventListener('error', failedToConnect, { once: true });
+ws.addEventListener('close', failedToConnect, { once: true });
+await new Promise((r) => ws.addEventListener('open', r, { once: true }));
+connected = true;
 clearTimeout(startTimer);
 
 let seq = 0; const waits = {}; const errors = []; const dialogs = []; let dialogAnswer = true;
