@@ -15,7 +15,7 @@ For AI assistants: read [AGENTS.md](AGENTS.md).
 ## First run (two minutes)
 
 1. Install Python 3.10 or newer (tested on 3.13; [python.org](https://www.python.org/downloads/); on Windows tick "Add python.exe to PATH").
-2. Download `sf-test-plan-0.1.0.zip` from the [releases page](https://github.com/taosecurity/sf-test-plan/releases) and unpack it anywhere.
+2. Download `sf-test-plan-0.1.1.zip` from the [releases page](https://github.com/taosecurity/sf-test-plan/releases) and unpack it anywhere.
 3. Open a terminal in the unpacked folder and build the example page:
 
    ```

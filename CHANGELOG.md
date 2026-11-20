@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1 (2026-11-20)
+
+- Page: when another tab removes the saved marks, the "Saved in this browser at ..." line no longer shows the old time.
+- Page: Reset with damaged saved data now says the saved copy couldn't be read and was replaced, instead of counting marks held in memory as kept.
+- Tests run on GitHub Actions: unit tests on Windows and Linux with Python 3.10 and 3.13, a check that both systems build the same release zip, and the page test with Chrome on Windows.
+- The release zip leaves out the repo's CI setup (`.github/`).
+
 ## 0.1.0 (2026-11-19)
 
 First release.

@@ -162,7 +162,22 @@ try {
     const resetMsg = await ev(`(document.getElementById('toolmsg')||{}).textContent||''`);
     check("Reset clears this page's steps, keeps another build's mark and says so",
       (await stored())?.checks?.['998.7']?.n === 'other build' && (await markOf(a)) === '' && /1 saved mark from another build/.test(resetMsg), resetMsg);
+    // Reset when the saved copy is damaged says so instead of counting the marks this tab held as kept
+    await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(before))})`);
+    await load(true);
+    await ev(`localStorage.setItem(sfTestplan.key, '{not json')`);
+    await ev(`sfTestplan.reset({confirm: () => true})`); await sleep(100);
+    const damagedMsg = await ev(`(document.getElementById('toolmsg')||{}).textContent||''`);
+    check("Reset with damaged saved data says the saved copy couldn't be read, not how many were kept",
+      /couldn't be read/.test(damagedMsg) && !/kept/.test(damagedMsg) && (await markOf(a)) === '', damagedMsg);
     delete before.checks['998.7'];   // put this page's marks back for the rest of the test
+    await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(before))})`);
+    await load(true);
+    // another tab removes the saved marks: the save line drops the old "Saved at" time
+    check('the save line shows a saved time before another tab clears it', /Saved in this browser at/.test(await ev(`document.getElementById('saved').textContent`)));
+    await ev(`localStorage.removeItem(sfTestplan.key); window.dispatchEvent(new StorageEvent('storage', {key: sfTestplan.key}))`); await sleep(100);
+    const lineAfter = await ev(`document.getElementById('saved').textContent`);
+    check('after another tab clears the saved marks, the save line shows no stale time', !/Saved in this browser at/.test(lineAfter) && /saved in this browser/i.test(lineAfter), lineAfter);
     await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(before))})`);
     await load(true);
   }

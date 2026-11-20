@@ -1,0 +1,74 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2026 Richard Bejtlich
+#
+# Runs the unit tests on Windows and Linux with Python 3.10 and 3.13, builds the release zip on both, and checks
+# that both systems built the same zip, byte for byte. Runs the page script's browser test (tests/page_test.mjs)
+# on Windows with the runner's Chrome. Releases are made by hand (README, "Release"), not here.
+# Actions are pinned to full commit SHAs (the tag each one was at is in the comment).
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+        python: ["3.10", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out files as committed (no CRLF on Windows, so both systems zip the same bytes)
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Unit tests
+        run: python -I -m unittest discover -s tests -v
+      - name: Release zip builds
+        run: python -I build_release.py --allow-dirty
+      - name: Keep the checksum
+        if: matrix.python == '3.13'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: sha256-${{ matrix.os }}
+          path: dist/*.sha256
+
+  same-zip:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          pattern: sha256-*
+      - name: Windows and Linux built the same zip
+        run: |
+          cat sha256-*/*.sha256
+          test "$(cat sha256-ubuntu-latest/*.sha256)" = "$(cat sha256-windows-latest/*.sha256)"
+
+  page-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
+        with:
+          node-version: "22"
+      - name: Find Chrome
+        id: chrome
+        shell: pwsh
+        run: |
+          $c = @("$env:ProgramFiles\Google\Chrome\Application\chrome.exe",
+                 "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if ($c) { "CHROME_PATH=$c" >> $env:GITHUB_ENV; "found=true" >> $env:GITHUB_OUTPUT; "Chrome: $c" }
+          else { "::notice::Chrome isn't installed on this runner, so the page test is skipped."; "found=false" >> $env:GITHUB_OUTPUT }
+      - name: Page test on the fixture page
+        if: steps.chrome.outputs.found == 'true'
+        run: node tests/page_test.mjs tests/fixtures/page_fixture.html

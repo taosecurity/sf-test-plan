@@ -65,15 +65,16 @@
     return { r: r, n: n, at: at, src: src, pn: v.pn === true || v.ns === "page" };
   }
   /* Reads the saved marks into state (this page's steps) and others. If storage can't be read or holds damaged
-     data, others is left as it was, so marks this tab already holds aren't lost. */
+     data, others is left as it was, so marks this tab already holds aren't lost.
+     Returns "ok", "empty" (nothing saved), "damaged" (saved data can't be read) or "unavailable" (no storage). */
   function readStore() {
-    if (!storageOk) return;
+    if (!storageOk) return "unavailable";
     var raw = null;
-    try { raw = window.localStorage.getItem(KEY); } catch (e) { storageOk = false; return; }
-    if (!raw) { others = Object.create(null); return; }
+    try { raw = window.localStorage.getItem(KEY); } catch (e) { storageOk = false; return "unavailable"; }
+    if (!raw) { others = Object.create(null); lastSaved = ""; return "empty"; }
     var data = null;
     try { data = JSON.parse(raw); } catch (e) { data = null; }
-    if (!data || typeof data !== "object" || !data.checks || typeof data.checks !== "object") return;
+    if (!data || typeof data !== "object" || !data.checks || typeof data.checks !== "object") return "damaged";
     others = Object.create(null);
     Object.keys(data.checks).forEach(function (id) {
       var s = sanitizeEntry(data.checks[id]);
@@ -81,7 +82,8 @@
       if (Object.prototype.hasOwnProperty.call(byId, id)) state[id] = s;
       else others[id] = s;
     });
-    if (typeof data.saved === "string") lastSaved = data.saved;
+    lastSaved = typeof data.saved === "string" ? data.saved : "";
+    return "ok";
   }
   var dirty = {};   /* ids changed here and not yet written (a note waiting for its pause) */
   function writeStore() {
@@ -543,7 +545,7 @@
     /* Another tab may have saved while the question was open. With no dialog from here on: read storage again
        (so other builds' newest marks are the ones kept), clear this page's steps, stop the note timers (their
        write now carries the cleared state), and save. Marks for steps this page doesn't have always stay. */
-    readStore();
+    var read = readStore();
     state = {};
     dirty = {};
     flushNotes();
@@ -551,6 +553,7 @@
     writeStore();
     var kept = Object.keys(others).length;
     if (!storageOk) say("Marks and notes on this page cleared here, but this browser isn't saving: reload may bring them back.", "warn");
+    else if (read === "damaged") say("Marks and notes on this page cleared. The saved copy in this browser couldn't be read, so it was replaced; Import an Export to bring back marks from other builds.", "warn");
     else say("Marks and notes on this page cleared." + (kept ? " " + kept + " saved mark" + (kept === 1 ? "" : "s") + " from another build (for steps this page doesn't have) kept." : ""), "ok");
     return true;
   }

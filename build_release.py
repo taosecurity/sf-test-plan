@@ -10,8 +10,8 @@ Also writes build/release-notes.md (the CHANGELOG entry), used as the GitHub rel
 The zip holds one folder, sf-test-plan-<version>/, with fixed file times, Unix "made on" system, mode 0644 and no
 compression, so the same commit gives the same zip on any system. Files come from the commit (git show HEAD:<file>);
 a working tree with changes to shipped files is refused (--allow-dirty builds from disk, for trying things out).
-Shipped files: every tracked file except the private ones (the same list sync_public.py keeps out) and the
-build helpers' outputs.
+Shipped files: every tracked file except the private ones (the same list sync_public.py keeps out), the
+build helpers' outputs and the repo's CI setup (.github/).
 """
 import argparse
 import hashlib
@@ -23,7 +23,7 @@ import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 NEVER_FILES = {"WORKPLAN.md", "NOTES.md", "sync_public.py", ".gitignore"}
-NEVER_DIRS = ("tools/",)
+NEVER_DIRS = ("tools/", ".github/")
 FIXED_TIME = (2026, 1, 1, 0, 0, 0)
 
 
