@@ -2,8 +2,31 @@
 
 ## 0.2.0 (2026-11-20)
 
-- The page now checks the format of the marks saved in the browser. When they come from a newer sf-test-plan (a newer major store format), the page never writes over them: it keeps its own marks in memory, and the save line says to use Export or open the plan with that newer version. Import and Reset follow the same rule and say that they saved nothing. Any store format name that starts with `sf-test-plan-store/<n>`, where n is 1 or more, counts as newer whatever follows (such as `/2`, `/1.1` or `/2-rc`), except exactly `sf-test-plan-store/1`. After finding one, the page stays memory-only until it is reloaded, so other tabs' saves never replace the marks it shows. Saved marks with no format still count as format 1, and saved marks with any other format (such as `sf-test-plan-store/0`, `sf-test-plan-store/garbage` or another name) count as damaged.
+### What's new
+
+This release protects your marks. If a page finds marks in the browser that a newer sf-test-plan saved, it never writes over them: it keeps its own marks in memory and tells you to use Export, or to open the plan with that newer version. The page test that runs in CI is also sturdier, so it no longer hangs or crashes when Chrome is slow to start.
+
+### Example
+
+Building the example plan works as before:
+
+    > sf-test-plan build examples\Beacon.testplan.md
+    examples\Beacon.testplan.md: 3 groups, 6 checks, 5 smoke; 0 errors, 0 warnings
+    Page: examples\Beacon.testplan.html
+
+Open `examples\Beacon.testplan.html` in your browser, mark a step and reload the page: your marks are still there.
+
+### Changes to the page
+
+- The page now checks the format of the marks saved in the browser. When they come from a newer sf-test-plan (a newer major store format), the page never writes over them, and the save line says to use Export or open the plan with that newer version.
+- Import and Reset follow the same rule, and they say that they saved nothing.
+- A store format counts as newer when its name starts with `sf-test-plan-store/<n>`, where n is 1 or more, whatever follows (such as `/2`, `/1.1` or `/2-rc`). The one exception is exactly `sf-test-plan-store/1`, which is the current format.
+- After finding a newer format, the page saves nothing until it is reloaded, so other tabs' saves never replace the marks it shows.
+- Saved marks with no format still count as format 1. Saved marks with any other format (such as `sf-test-plan-store/0`, `sf-test-plan-store/garbage` or another name) count as damaged.
 - The warning about a damaged saved copy now says that your next saved change replaces it. Marks kept from other builds are saved too, and notes save after their short pause.
+
+### Changes to the page test (for developers)
+
 - The page test now waits for a page that Chrome lists with a connection address, instead of crashing when the address is missing.
 - If the page test loses its connection to Chrome during the run, it stops with its own message and exit code 2. A command that Chrome never answers fails after 30 seconds instead of hanging.
 - The page test has new checks for the store format: a newer format, a missing format, an unknown format name and format 1.
@@ -11,6 +34,10 @@
 - One timer covers the whole start, including the connection to Chrome, so the test can't hang there. While the test waits for Chrome, a request for its page list that gets no answer is dropped after 5 seconds and sent again.
 - If Chrome lists the page but the connection to it fails, the test stops at once with its own message. The timeout message names `TP_CDP_WAIT`.
 - The README now says that the page test needs Node 22 or newer.
+
+### Download
+
+Download `sf-test-plan-0.2.0.zip` below, unpack it and follow the Install steps in the README. It needs Python 3.10 or newer and nothing else.
 
 ## 0.1.1 (2026-11-20)
 
