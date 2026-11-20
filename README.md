@@ -115,7 +115,7 @@ New to testing mods? The STEP project's [Mod Testing guide](https://wiki.step-pr
 
 ## For developers
 
-GitHub Actions runs the unit tests on Windows and Linux with Python 3.10 and 3.13, checks that both systems build the same release zip, and runs the page test with Chrome on Windows. Unit tests: `python -I -m unittest discover -s tests`. The page script's browser test, `node tests\page_test.mjs <page.html> [screenshots folder]`, needs Node 18+ and Google Chrome on Windows (set `CHROME_PATH` if Chrome is elsewhere); it runs Chrome headless with the profile folder `%LOCALAPPDATA%\HeadlessChromeProfile`.
+GitHub Actions runs the unit tests on Windows and Linux with Python 3.10 and 3.13, checks that both systems build the same release zip, and runs the page test with Chrome on Windows. Unit tests: `python -I -m unittest discover -s tests`. The page script's browser test, `node tests\page_test.mjs <page.html> [screenshots folder]`, needs Node 18+ and Google Chrome on Windows (set `CHROME_PATH` if Chrome is elsewhere, and `TP_CDP_WAIT` to wait longer than 30 seconds for Chrome to start); it runs Chrome headless with the profile folder `%LOCALAPPDATA%\HeadlessChromeProfile`.
 
 ## License and credits
 

@@ -38,7 +38,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function finish(code) { try { proc.kill(); } catch { } try { rmSync(work, { recursive: true, force: true }); } catch { } process.exit(code); }
 
 let targets = [];
-for (let i = 0; i < 50 && !targets.some((t) => t.type === 'page'); i++) {
+// Chrome's first start on a fresh machine (a CI runner) can take well over 10 seconds; TP_CDP_WAIT sets the wait.
+const waitTries = Math.max(1, Math.round((Number(process.env.TP_CDP_WAIT) || 30) * 5));
+for (let i = 0; i < waitTries && !targets.some((t) => t.type === 'page'); i++) {
   try { targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json(); } catch { }
   await sleep(200);
 }

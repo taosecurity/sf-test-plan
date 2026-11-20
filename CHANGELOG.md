@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Page test: waits up to 30 seconds for Chrome to start (set `TP_CDP_WAIT` for longer), because a fresh CI runner can take more than 10 seconds.
+
 ## 0.1.1 (2026-11-20)
 
 - Page: when another tab removes the saved marks, the "Saved in this browser at ..." line no longer shows the old time.
