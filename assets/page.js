@@ -58,12 +58,13 @@
      marks stay in memory until a read finds format 1 again or nothing saved (FORMAT.md 2). */
   var storeNewer = false;
 
-  /* The major version of a saved copy's format: a missing format counts as 1; anything that isn't
-     "sf-test-plan-store/<n>" gives NaN. */
+  /* Which store format a saved copy has: 1 for exactly "sf-test-plan-store/1" or no format; 2 (treated as newer,
+     never written over) for any other "sf-test-plan-store/..." name, such as /2 or /1.1, so nothing a later
+     version adds is dropped; NaN (damaged) for anything else. */
   function storeMajor(data) {
-    if (data.format === undefined) return 1;
-    if (typeof data.format !== "string" || !/^sf-test-plan-store\/\d/.test(data.format)) return NaN;
-    return parseInt(data.format.split("/")[1], 10);
+    if (data.format === undefined || data.format === STORE_FORMAT) return 1;
+    if (typeof data.format === "string" && data.format.indexOf("sf-test-plan-store/") === 0) return 2;
+    return NaN;
   }
 
   function sanitizeEntry(v) {
@@ -602,7 +603,7 @@
     if (ev.key !== KEY && ev.key !== null) return;   /* null: all site data was cleared */
     /* Another tab saved, cleared or reset. Its save is the truth, so marks, clears and Reset carry over; only
        the note typed here and not yet written (dirty) is laid on top of its entry, and then saved. */
-    var mine = state, oursWon = false;
+    var mine = state, oursWon = false, wasNewer = storeNewer;
     state = {};
     var read = readStore();
     if (read === "damaged" || read === "newer" || read === "unavailable") {
@@ -611,6 +612,13 @@
       state = mine;
       sayStatus();
       return;
+    }
+    if (wasNewer) {
+      /* While the saved copy was a newer format, this tab's marks lived only in memory: merge them in (the newer
+         at wins, as in Import) and save, so they aren't lost now that saving works again. */
+      Object.keys(mine).forEach(function (id) {
+        if (hasAny(mine[id]) && (!hasAny(state[id]) || timeOf(mine[id].at) > timeOf(state[id].at))) { state[id] = mine[id]; oursWon = true; }
+      });
     }
     Object.keys(dirty).forEach(function (id) {
       var a = mine[id] || { n: "" };   /* an emptied note counts too: deleting it is the change */

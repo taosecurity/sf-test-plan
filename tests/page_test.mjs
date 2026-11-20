@@ -70,7 +70,13 @@ clearTimeout(startTimer);
 
 let seq = 0; const waits = {}; const errors = []; const dialogs = []; let dialogAnswer = true;
 // After the connection opens: losing it ends the test with exit 2, and a command Chrome never answers fails after 30 s.
-ws.addEventListener('close', () => { console.log(`Lost the connection to Chrome during the test. Run it again, and close other headless Chrome windows using the profile.`); finish(2); });
+// Checks that already failed still count: exit 1 if any did, else 2 (a Chrome problem, not a page failure).
+let fails = 0;
+ws.addEventListener('close', () => {
+  console.log(`Lost the connection to Chrome during the test. Run it again, and close other headless Chrome windows using the profile.`);
+  if (fails) console.log(`${fails} FAILED before the connection was lost`);
+  finish(fails ? 1 : 2);
+});
 const SEND_WAIT = 30;
 const send = (method, params = {}) => new Promise((resolve, reject) => {
   const i = ++seq;
@@ -103,8 +109,7 @@ async function load(reload) {
   return false;
 }
 
-let fails = 0;
-const check = (name, ok, info = '') => { console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${!ok && info ? ': ' + info : ''}`); if (!ok) fails++; };
+const check =(name, ok, info = '') => { console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${!ok && info ? ': ' + info : ''}`); if (!ok) fails++; };
 const HOSTILE = '<img src=x onerror=alert(1)>';
 const safe = (cid) => cid.replace(/[^A-Za-z0-9_-]/g, '-');
 const click = (cid, v) => ev(`document.querySelector('label[for="r-${safe(cid)}-${v}"]').click()`);
@@ -243,6 +248,13 @@ try {
     await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(Object.assign({}, before, { format: 'something-else' })))})`);
     await load(true);
     check('a saved copy with an unknown format name counts as damaged', /can't be read/.test(await ev(`document.getElementById('saved').textContent`)) && (await markOf(a)) === '');
+    // a minor or odd store version (sf-test-plan-store/1.1) counts as newer, so nothing a later version adds is dropped
+    const minor = JSON.stringify(Object.assign({}, before, { format: 'sf-test-plan-store/1.1', meta: { x: 1 } }));
+    await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(minor)})`);
+    await load(true);
+    await click(b, 'skip'); await sleep(100);
+    check('sf-test-plan-store/1.1 counts as newer and is never written over',
+      (await ev(`localStorage.getItem(sfTestplan.key)`)) === minor && /newer sf-test-plan/.test(await ev(`document.getElementById('saved').textContent`)));
 
     // a newer major format (a newer sf-test-plan) is never written over: not by a change, Import or Reset
     const newer = JSON.stringify({ format: 'sf-test-plan-store/2', run, saved: '2040-01-01T00:00:00Z', future: { x: 1 }, checks: { [a]: { r: 'fail', n: 'from v2', at: '2040-01-01T00:00:00Z' } } });
@@ -272,6 +284,8 @@ try {
     check('a newer store format from another tab keeps the marks shown here and is never written over',
       (await markOf(a)) === 'pass' && (await markOf(c)) === 'fail' && (await raw()) === newer && /newer sf-test-plan/.test(await ev(`document.getElementById('saved').textContent`)));
     await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(before))}); window.dispatchEvent(new StorageEvent('storage', {key: sfTestplan.key}))`); await sleep(100);
+    check("marks made here while the saved copy was newer survive another tab's format 1 save, and are saved",
+      (await markOf(c)) === 'fail' && (await stored())?.checks?.[c]?.r === 'fail' && (await markOf(a)) === 'pass', `${await markOf(c)} | ${JSON.stringify((await stored())?.checks?.[c])}`);
     await click(c, 'skip'); await sleep(100);
     check("another tab's format 1 save ends the newer-format warning and saving starts again",
       !/newer sf-test-plan/.test(await ev(`document.getElementById('saved').textContent`)) && (await stored())?.format === 'sf-test-plan-store/1' && (await stored())?.checks?.[c]?.r === 'skip');
