@@ -177,10 +177,13 @@ try {
     await ev(`localStorage.setItem(sfTestplan.key, '{not json'); window.dispatchEvent(new StorageEvent('storage', {key: sfTestplan.key}))`); await sleep(100);
     // (a same-tab StorageEvent: the test doesn't cover two real tabs racing)
     const dmgLine = await ev(`document.getElementById('saved').textContent`);
-    const dmgMsg = await ev(`(document.getElementById('toolmsg')||{}).textContent||''`);
-    check("damaged data from another tab keeps the marks shown here, writes nothing and says they aren't saved yet",
+    check("damaged data from another tab keeps the marks shown here, writes nothing and the save line says they aren't saved yet",
       (await markOf(a)) === 'pass' && (await noteOf(a)) === 'first note' && (await ev(`localStorage.getItem(sfTestplan.key)`)) === '{not json' &&
-      !/Saved in this browser at/.test(dmgLine) && /can't read/.test(dmgMsg), `${await markOf(a)} | ${dmgLine} | ${dmgMsg}`);
+      /can't read/.test(dmgLine) && /aren't saved yet/.test(dmgLine), `${await markOf(a)} | ${dmgLine}`);
+    await click(a, 'pass'); await click(a, 'pass'); await sleep(100);   // the next change here
+    const s1 = await stored();
+    check('after damaged data, the next change saves the marks shown here and the warning goes',
+      s1?.checks?.[a]?.r === 'pass' && s1?.checks?.[a]?.n === 'first note' && /Saved in this browser at/.test(await ev(`document.getElementById('saved').textContent`)), JSON.stringify(s1)?.slice(0, 200));
     await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(before))})`);
     await load(true);
     // another tab removes the saved marks: the save line drops the old "Saved at" time

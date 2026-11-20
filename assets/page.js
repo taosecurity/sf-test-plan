@@ -53,6 +53,7 @@
      number; a new build that changes its steps should get a new run: (README, FORMAT.md 2). */
   var others = Object.create(null);
   var lastSaved = "";   /* ISO time of the last write to storage */
+  var storeDamaged = false;   /* another tab left saved data this page can't read; cleared by the next good read or save */
 
   function sanitizeEntry(v) {
     if (!v || typeof v !== "object") return null;
@@ -71,7 +72,7 @@
     if (!storageOk) return "unavailable";
     var raw = null;
     try { raw = window.localStorage.getItem(KEY); } catch (e) { storageOk = false; return "unavailable"; }
-    if (!raw) { others = Object.create(null); lastSaved = ""; return "empty"; }
+    if (!raw) { others = Object.create(null); lastSaved = ""; storeDamaged = false; return "empty"; }
     var data = null;
     try { data = JSON.parse(raw); } catch (e) { data = null; }
     if (!data || typeof data !== "object" || !data.checks || typeof data.checks !== "object") return "damaged";
@@ -83,6 +84,7 @@
       else others[id] = s;
     });
     lastSaved = typeof data.saved === "string" ? data.saved : "";
+    storeDamaged = false;
     return "ok";
   }
   var dirty = {};   /* ids changed here and not yet written (a note waiting for its pause) */
@@ -100,6 +102,7 @@
         window.localStorage.removeItem(KEY);
         lastSaved = "";
       }
+      storeDamaged = false;
     } catch (e) {
       storageOk = false;  /* blocked or full: carry on in memory */
     }
@@ -112,6 +115,9 @@
     var text, cls;
     if (!storageOk) {
       text = "Marks aren't saved in this browser: use Export before closing.";
+      cls = "saved warn";
+    } else if (storeDamaged) {
+      text = "Another tab left saved marks this page can't read, so the marks shown here aren't saved yet: they are saved with your next change, or use Export.";
       cls = "saved warn";
     } else if (lastSaved) {
       text = "Saved in this browser at " + localStamp(new Date(timeOf(lastSaved))) + ".";
@@ -583,10 +589,7 @@
       /* Nothing readable to take over: keep the marks this tab shows, write nothing (so tabs never answer each
          other's saves), and say plainly that they aren't saved until the next change here. */
       state = mine;
-      if (read === "damaged") {
-        lastSaved = "";
-        say("Another tab left saved marks this page can't read. The marks shown here are saved again with your next change; use Export to keep a copy now.", "warn");
-      }
+      if (read === "damaged") { lastSaved = ""; storeDamaged = true; }
       sayStatus();
       return;
     }
