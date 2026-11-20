@@ -80,6 +80,15 @@ class SecondReviewFixes(unittest.TestCase):
             p = parse.parse_text(f"# T\nrun: r1\nmod: {mod}\n\n## 1 G\n- [ ] one\n", path=os.path.join(mod, "testplan.md"))
             return cfg(p)["plan"]
         self.assertNotEqual(by_mod("ModA"), by_mod("ModB"))
+        # ... and without a mod: line, by folder
+        def no_mod(folder):
+            p = parse.parse_text("# T\nrun: r1\n\n## 1 G\n- [ ] one\n", path=os.path.join(folder, "testplan.md"))
+            return cfg(p)["plan"]
+        self.assertNotEqual(no_mod("ModA"), no_mod("ModB"))
+        # mod case and spaces don't matter
+        p1 = parse.parse_text("# T\nrun: r1\nmod: Astrid  Reloaded\n\n## 1 G\n- [ ] one\n", path=os.path.join("A", "t.md"))
+        p2 = parse.parse_text("# T\nrun: r1\nmod: astrid reloaded\n\n## 1 G\n- [ ] one\n", path=os.path.join("A", "t.md"))
+        self.assertEqual(cfg(p1)["plan"], cfg(p2)["plan"])
 
     def test_all_smoke_group_keeps_its_intro(self):
         from sftestplan import render

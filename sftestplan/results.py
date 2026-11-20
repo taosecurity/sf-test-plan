@@ -106,7 +106,6 @@ def read_marks(path: str) -> dict:
             "id": cid, "r": r, "n": _str(c.get("n")), "t": _str(c.get("t")),
             "g": g if isinstance(g, int) and not isinstance(g, bool) else None,
             "at": _str(c.get("at")), "src": _str(c.get("src")),
-            "ns": "page" if c.get("ns") == "page" else "",   # FORMAT.md 3: the note was typed by a person
         })
     log.debug("read %s: run %s, %d checks", path, run, len(out_checks))
     return {"format": fmt, "run": run, "title": _str(data.get("title")), "exported": _str(data.get("exported")),

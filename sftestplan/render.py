@@ -150,10 +150,16 @@ def render(plan: Plan, results: list[dict] | None = None) -> str:
     total = len(smoke) if smoke else len(checks)
     rows = [r for r in (results or []) if isinstance(r, dict)]
     # browsers share one storage area for all file:// pages, so the page's storage key also names the plan: its
-    # file name (two plans for one mod differ) and its mod (two testplan.md files in different mod folders differ),
-    # plus the run. The title isn't part of it, so fixing a typo in it keeps the marks.
-    name = os.path.basename(plan.path).lower() if plan.path and not plan.path.startswith("<") else title
-    plan_id = hashlib.sha256(f"{name}\n{plan.mod}\n{plan.run}".encode("utf-8")).hexdigest()[:12]
+    # folder and file name (two plans for one mod differ; two testplan.md files in different folders differ, with or
+    # without a mod: line), its mod (case and spaces ignored) and its run. The title isn't part of it, so fixing a
+    # typo in it keeps the marks.
+    if plan.path and not plan.path.startswith("<"):
+        full = os.path.abspath(plan.path)
+        name = os.path.basename(os.path.dirname(full)).lower() + "/" + os.path.basename(full).lower()
+    else:
+        name = title
+    mod = " ".join(plan.mod.split()).casefold()
+    plan_id = hashlib.sha256(f"{name}\n{mod}\n{plan.run}".encode("utf-8")).hexdigest()[:12]
     config = {"format": model.PAGE_FORMAT, "run": plan.run, "title": title, "tool": model.TOOL_ID,
               "mod": plan.mod, "version": plan.version, "zip": plan.zip, "total": total, "plan": plan_id}
 

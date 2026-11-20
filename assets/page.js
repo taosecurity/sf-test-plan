@@ -47,8 +47,7 @@
     storageOk = true;
   } catch (e) { storageOk = false; }
 
-  var state = {};       /* id -> {r, n, at, src, pn} for checks on this page */
-  var others = Object.create(null);   /* stored entries for ids not on this page (an older or newer build): written back as they are */
+  var state = {};       /* id -> {r, n, at, src, pn, t} for checks on this page */
   var lastSaved = "";   /* ISO time of the last write to storage */
 
   function sanitizeEntry(v) {
@@ -64,7 +63,6 @@
   }
   function readStore() {
     if (!storageOk) return;
-    others = Object.create(null);
     var raw = null;
     try { raw = window.localStorage.getItem(KEY); } catch (e) { storageOk = false; return; }
     if (!raw) return;
@@ -74,11 +72,10 @@
     Object.keys(data.checks).forEach(function (id) {
       var s = sanitizeEntry(data.checks[id]);
       if (!s || !hasAny(s) || id.length > 40) return;
-      /* A stored mark shows only on the step it was made for: same id and same step text. A step a rebuild
-         removed, or an id now used for a different step, keeps its mark in storage, untouched and hidden. */
-      var here = Object.prototype.hasOwnProperty.call(byId, id);
-      if (here && (!s.t || s.t === stepText(byId[id].li))) state[id] = s;
-      else others[id] = s;
+      /* A stored mark counts only for the step it was made for: same id and same step text. When a rebuild
+         removed or changed a step, its old mark is dropped at the next save (FORMAT.md 2; a new build should
+         get a new run: anyway). */
+      if (Object.prototype.hasOwnProperty.call(byId, id) && (!s.t || s.t === stepText(byId[id].li))) state[id] = s;
     });
     if (typeof data.saved === "string") lastSaved = data.saved;
   }
@@ -87,12 +84,11 @@
     dirty = {};
     if (!storageOk) { sayStatus(); return; }
     var keep = Object.create(null);
-    Object.keys(others).forEach(function (id) { keep[id] = others[id]; });
     Object.keys(state).forEach(function (id) {
       if (!hasAny(state[id])) return;
       var e = {}, s = state[id];
       Object.keys(s).forEach(function (k) { e[k] = s[k]; });
-      e.t = byId[id] ? stepText(byId[id].li) : (s.t || "");   /* the step this mark was made for */
+      e.t = stepText(byId[id].li);   /* the step this mark was made for */
       keep[id] = e;
     });
     try {
@@ -449,6 +445,10 @@
       var r = c.r === undefined || c.r === null ? "" : c.r;
       if (r !== "" && RESULTS.indexOf(r) < 0) { res.bad++; return; }
       var inc = sanitizeEntry({ r: r, n: c.n, at: c.at, src: c.src, ns: c.ns });   /* ns: the note's source survives Export/Import */
+      /* a mark exported from a page built with different step text (another build reused this id) doesn't land
+         on this step. Log marks are written from the plan given to `sf-test-plan logs`, so they aren't checked. */
+      var ft = typeof c.t === "string" ? clean(c.t).slice(0, 300) : "";
+      if (inc.src !== "log" && ft && ft !== stepText(byId[c.id].li)) { res.otherStep = (res.otherStep || 0) + 1; return; }
       if (!hasAny(inc)) { res.bad++; return; }
       var cur = state[c.id];
       /* A mark from the log never replaces the tester's own mark or note: a person's Fail beats a log line. */
@@ -464,6 +464,7 @@
     writeStore();
     var parts = ["Imported " + res.added + (res.added === 1 ? " check" : " checks") + "."];
     if (res.kept) parts.push(res.kept + " kept as they were, because the marks here are newer or are your own (a log mark never replaces them).");
+    if (res.otherStep) parts.push(res.otherStep + " skipped because they were made for a different step with the same number (another build of this plan).");
     if (res.unknown.length) parts.push(res.unknown.length + " not on this page and not added: " + res.unknown.slice(0, 12).join(", ") + (res.unknown.length > 12 ? ", ..." : "") + ".");
     if (res.bad) parts.push(res.bad + " skipped because they were damaged or empty.");
     res.message = parts.join(" ");
@@ -541,17 +542,12 @@
   function doReset(opts) {
     opts = opts || {};
     var ask = opts.confirm || function (q) { return window.confirm(q); };
-    var hidden = Object.keys(others).length;
-    var q = "Clear every mark and note on this page (run " + RUN + ")" +
-      (hidden ? ", and " + hidden + " stored mark" + (hidden === 1 ? "" : "s") + " for steps this page doesn't show (from another build)" : "") +
-      "? Use Export first if you want to keep them.";
-    if (!ask(q)) {
+    if (!ask("Clear every mark and note on this page (run " + RUN + ")? Use Export first if you want to keep them.")) {
       say("Nothing cleared.");
       return false;
     }
     flushNotes();      /* stop the note timers first, so none of them writes after the reset */
     state = {};
-    others = Object.create(null);   /* Reset clears this run's stored marks, other builds' ids included */
     dirty = {};
     paintAll(true);
     writeStore();
