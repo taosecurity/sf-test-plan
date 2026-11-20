@@ -173,6 +173,11 @@ try {
     delete before.checks['998.7'];   // put this page's marks back for the rest of the test
     await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(before))})`);
     await load(true);
+    // another tab writes damaged data: this tab keeps the marks it shows
+    await ev(`localStorage.setItem(sfTestplan.key, '{not json'); window.dispatchEvent(new StorageEvent('storage', {key: sfTestplan.key}))`); await sleep(100);
+    check('damaged data from another tab leaves the marks shown here as they were', (await markOf(a)) === 'pass' && (await noteOf(a)) === 'first note', `${await markOf(a)} ${await noteOf(a)}`);
+    await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(before))})`);
+    await load(true);
     // another tab removes the saved marks: the save line drops the old "Saved at" time
     check('the save line shows a saved time before another tab clears it', /Saved in this browser at/.test(await ev(`document.getElementById('saved').textContent`)));
     await ev(`localStorage.removeItem(sfTestplan.key); window.dispatchEvent(new StorageEvent('storage', {key: sfTestplan.key}))`); await sleep(100);

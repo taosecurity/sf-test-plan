@@ -4,6 +4,7 @@
 
 - Page: when another tab removes the saved marks, the "Saved in this browser at ..." line no longer shows the old time.
 - Page: Reset with damaged saved data now says the saved copy couldn't be read and was replaced, instead of counting marks held in memory as kept.
+- Page: when another tab writes saved data that can't be read, this tab keeps the marks it shows instead of clearing them.
 - Tests run on GitHub Actions: unit tests on Windows and Linux with Python 3.10 and 3.13, a check that both systems build the same release zip, and the page test with Chrome on Windows.
 - The release zip leaves out the repo's CI setup (`.github/`).
 

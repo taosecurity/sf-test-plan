@@ -578,7 +578,13 @@
        the note typed here and not yet written (dirty) is laid on top of its entry, and then saved. */
     var mine = state, oursWon = false;
     state = {};
-    readStore();
+    var read = readStore();
+    if (read === "damaged" || read === "unavailable") {
+      /* Nothing readable to take over: keep the marks this tab shows (the next save writes them back). */
+      state = mine;
+      sayStatus();
+      return;
+    }
     Object.keys(dirty).forEach(function (id) {
       var a = mine[id] || { n: "" };   /* an emptied note counts too: deleting it is the change */
       var b = state[id] || { r: "", n: "", at: "", src: "page", pn: false };
