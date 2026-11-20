@@ -14,7 +14,7 @@ For AI assistants: read [AGENTS.md](AGENTS.md).
 
 ## First run (two minutes)
 
-1. Install Python 3.10 or newer (tested on 3.13; [python.org](https://www.python.org/downloads/); on Windows tick "Add python.exe to PATH").
+1. Install Python 3.10 or newer (tested on 3.10 and 3.13, on Windows and Linux; [python.org](https://www.python.org/downloads/); on Windows tick "Add python.exe to PATH").
 2. Download `sf-test-plan-0.1.1.zip` from the [releases page](https://github.com/taosecurity/sf-test-plan/releases) and unpack it anywhere.
 3. Open a terminal in the unpacked folder and build the example page:
 
@@ -115,7 +115,7 @@ New to testing mods? The STEP project's [Mod Testing guide](https://wiki.step-pr
 
 ## For developers
 
-Unit tests: `python -I -m unittest discover -s tests`. The page script's browser test, `node tests\page_test.mjs <page.html> [screenshots folder]`, needs Node 18+ and Google Chrome on Windows (set `CHROME_PATH` if Chrome is elsewhere); it runs Chrome headless with the profile folder `%LOCALAPPDATA%\HeadlessChromeProfile`.
+GitHub Actions runs the unit tests on Windows and Linux with Python 3.10 and 3.13, checks that both systems build the same release zip, and runs the page test with Chrome on Windows. Unit tests: `python -I -m unittest discover -s tests`. The page script's browser test, `node tests\page_test.mjs <page.html> [screenshots folder]`, needs Node 18+ and Google Chrome on Windows (set `CHROME_PATH` if Chrome is elsewhere); it runs Chrome headless with the profile folder `%LOCALAPPDATA%\HeadlessChromeProfile`.
 
 ## License and credits
 

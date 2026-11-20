@@ -14,7 +14,7 @@ it for automated tests, and don't treat its results as proof a mod is safe: it r
 
 ## 2. Prerequisites
 
-- Python 3.10 or newer (tested on 3.13). Standard library only: nothing to install.
+- Python 3.10 or newer (tested on 3.10 and 3.13, on Windows and Linux). Standard library only: nothing to install.
 - Windows, Linux or macOS. Any current browser (Chrome, Edge, Firefox, Safari) for the page.
 - Optional: papyrus-log-check 0.3.0 or newer, for `logs`.
 
