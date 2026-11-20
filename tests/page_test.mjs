@@ -254,9 +254,14 @@ try {
   check('Reset clears every mark, note and the stored copy on yes', (await ev(`document.querySelectorAll('.seg input:checked').length`)) === 0 && (await noteOf(a)) === '' && (await stored()) === null && (await openN()) === open0);
 
   // A malformed address fragment must not stop the page (code review, 2026-11-19)
-  await send('Page.navigate', { url: pageUrl + '#%E0' }); await sleep(600);
-  check('a malformed #fragment in the address leaves the page working', await ev(`!!window.sfTestplan && document.querySelectorAll('.seg').length === ${ids.length}`).catch(() => false));
+  // a fresh load (about:blank first, so this isn't just a fragment change in the same document)
+  await click(a, 'pass'); await sleep(100);
+  await send('Page.navigate', { url: 'about:blank' }); await sleep(300);
+  await send('Page.navigate', { url: pageUrl + '#%E0' }); await sleep(800);
+  check('a malformed #fragment in the address leaves the page working (marks load)',
+    (await ev(`!!window.sfTestplan && document.querySelectorAll('.seg').length === ${ids.length}`).catch(() => false)) && (await markOf(a)) === 'pass');
   await load(false);
+  await click(a, 'pass'); await sleep(100);
 
   // Everything marked Pass: the tally never goes past its total (code review, 2026-11-19)
   if (hasSmoke) await ev(`document.getElementById('deep') && (document.getElementById('deep').open = true)`);

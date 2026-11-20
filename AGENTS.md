@@ -95,7 +95,7 @@ when something goes wrong.
 - It never uploads anything and makes no network connections; the page loads nothing from the internet.
 - It never changes the plan file. `import` only adds a row to the results file and refuses to overwrite a broken one.
 - Marks live in the browser's local storage for that page file. A private window keeps them only until the tab
-  closes. Marks are kept per plan (its mod, or title without one, and its run): copies of one page in the same browser share them, and
+  closes. Marks are kept per plan (its file name and its run): copies of one page in the same browser share them, and
   another browser or computer starts empty. Export to move them. A mark imported from `logs` never replaces a
   tester's own mark or note.
 - It doesn't run the game, read saves, or decide whether a mod works: a person marks the steps, and `logs` marks only

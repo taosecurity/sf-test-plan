@@ -87,10 +87,11 @@ def _json_for_script(obj) -> str:
 
 
 def _check_li(c: Check, groups: dict[int, Group], show_from: bool, intro: str = "") -> str:
-    # the step is the first <div> in .what: the page script reads it as the step text, so anything else goes after
-    parts = [f'<span class="id">{esc(c.id)}</span>', f"<div>{inline(c.step)}</div>"]
+    # the page script reads the step text from div.step; a group intro (a precondition) is read first, so it goes first
+    parts = [f'<span class="id">{esc(c.id)}</span>']
     if intro:
         parts += [f'<div class="group-intro">{inline(p)}</div>' for p in re.split(r"\n\s*\n", intro) if p.strip()]
+    parts.append(f'<div class="step">{inline(c.step)}</div>')
     if c.expect:
         parts.append(f'<div class="expect">Expect: {inline(c.expect)}</div>')
     if c.note:
@@ -149,8 +150,9 @@ def render(plan: Plan, results: list[dict] | None = None) -> str:
     total = len(smoke) if smoke else len(checks)
     rows = [r for r in (results or []) if isinstance(r, dict)]
     # browsers share one storage area for all file:// pages, so the page's storage key also names the plan: its
-    # mod and run (the title only when there is no mod), so fixing a typo in the title keeps the marks
-    plan_id = hashlib.sha256(f"{plan.mod or title}\n{plan.run}".encode("utf-8")).hexdigest()[:12]
+    # file name (different for every plan, the same across rebuilds and title edits) and run
+    name = os.path.basename(plan.path).lower() if plan.path and not plan.path.startswith("<") else title
+    plan_id = hashlib.sha256(f"{name}\n{plan.run}".encode("utf-8")).hexdigest()[:12]
     config = {"format": model.PAGE_FORMAT, "run": plan.run, "title": title, "tool": model.TOOL_ID,
               "mod": plan.mod, "version": plan.version, "zip": plan.zip, "total": total, "plan": plan_id}
 

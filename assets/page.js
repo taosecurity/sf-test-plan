@@ -19,7 +19,7 @@
   var TITLE = typeof CFG.title === "string" ? CFG.title : document.title;
   var TOOL = typeof CFG.tool === "string" ? CFG.tool : "sf-test-plan";
   /* Browsers share one storage area for every file:// page, so the key names the plan as well as the run
-     (CFG.plan: a short hash of the title, mod and run made at build time). */
+     (CFG.plan: a short hash of the plan's file name and run, made at build time). */
   var PLAN = typeof CFG.plan === "string" && /^[0-9a-f]{1,32}$/.test(CFG.plan) ? CFG.plan : "";
   var KEY = "sf-test-plan:" + RUN + (PLAN ? ":" + PLAN : "");
 
@@ -47,7 +47,8 @@
     storageOk = true;
   } catch (e) { storageOk = false; }
 
-  var state = {};       /* id -> {r, n, at, src} */
+  var state = {};       /* id -> {r, n, at, src, pn} for checks on this page */
+  var others = Object.create(null);   /* stored entries for ids not on this page (an older or newer build): written back as they are */
   var lastSaved = "";   /* ISO time of the last write to storage */
 
   function sanitizeEntry(v) {
@@ -58,10 +59,11 @@
     var src = v.src === "log" ? "log" : "page";
     /* pn: the note was typed by a person here (kept in this browser only, never exported), so a log mark can
        stay a log mark while the tester's note survives a later log import */
-    return { r: r, n: n, at: at, src: src, pn: v.pn === true };
+    return { r: r, n: n, at: at, src: src, pn: v.pn === true || v.ns === "page" };
   }
   function readStore() {
     if (!storageOk) return;
+    others = Object.create(null);
     var raw = null;
     try { raw = window.localStorage.getItem(KEY); } catch (e) { storageOk = false; return; }
     if (!raw) return;
@@ -69,8 +71,11 @@
     try { data = JSON.parse(raw); } catch (e) { data = null; }
     if (!data || typeof data !== "object" || !data.checks || typeof data.checks !== "object") return;
     Object.keys(data.checks).forEach(function (id) {
-      if (!Object.prototype.hasOwnProperty.call(byId, id)) return;   /* only checks on this page */
       var s = sanitizeEntry(data.checks[id]);
+      if (!Object.prototype.hasOwnProperty.call(byId, id)) {   /* not on this page: keep it untouched */
+        if (s && hasAny(s) && id.length <= 40) others[id] = s;
+        return;
+      }
       if (s && hasAny(s)) state[id] = s;
     });
     if (typeof data.saved === "string") lastSaved = data.saved;
@@ -80,6 +85,7 @@
     dirty = {};
     if (!storageOk) { sayStatus(); return; }
     var keep = {};
+    Object.keys(others).forEach(function (id) { keep[id] = others[id]; });
     Object.keys(state).forEach(function (id) { if (hasAny(state[id])) keep[id] = state[id]; });
     try {
       if (Object.keys(keep).length) {
@@ -138,7 +144,7 @@
   var hasSmoke = !!$("smoke");
 
   function stepText(li) {
-    var d = li.querySelector(".what > div");
+    var d = li.querySelector(".what > .step") || li.querySelector(".what > div:not(.group-intro)");
     if (!d) return "";
     var c = d.cloneNode(true);
     Array.prototype.forEach.call(c.querySelectorAll(".copycmd"), function (b) { b.parentNode.removeChild(b); });
@@ -195,7 +201,9 @@
     ta.addEventListener("input", function () {
       var s = entry(id);
       s.n = ta.value.slice(0, MAX_NOTE);
-      s.at = nowIso();
+      /* a note on a log mark leaves the mark's time alone, so a newer log result can still replace the result
+         (the note stays: pn); on the tester's own entry the time moves, as for any change */
+      if (!(s.src === "log" && s.r)) s.at = nowIso();
       s.pn = true;      /* a person's note; the mark keeps its own source (page or log) */
       dirty[id] = true;
       paintClasses(id);
@@ -377,7 +385,9 @@
       var id = li.getAttribute("data-id");
       var s = state[id];
       if (!byId[id] || byId[id].li !== li || !hasAny(s)) return;
-      out.push({ id: id, r: s.r || "", n: s.n || "", t: stepText(li), g: groupOf(li), at: s.at || nowIso(), src: s.src === "log" ? "log" : "page" });
+      var row = { id: id, r: s.r || "", n: s.n || "", t: stepText(li), g: groupOf(li), at: s.at || nowIso(), src: s.src === "log" ? "log" : "page" };
+      if (s.pn && s.n) row.ns = "page";   /* the note was typed by a person (FORMAT.md 3) */
+      out.push(row);
     });
     return { format: MARKS_FORMAT, run: RUN, title: TITLE, exported: nowIso(), tool: TOOL, checks: out };
   }
@@ -531,6 +541,7 @@
     }
     flushNotes();      /* stop the note timers first, so none of them writes after the reset */
     state = {};
+    others = Object.create(null);   /* Reset clears this run's stored marks, other builds' ids included */
     dirty = {};
     paintAll(true);
     writeStore();
@@ -560,12 +571,11 @@
     state = {};
     readStore();
     Object.keys(dirty).forEach(function (id) {
-      var a = mine[id];
-      if (!a || !a.n) return;
+      var a = mine[id] || { n: "" };   /* an emptied note counts too: deleting it is the change */
       var b = state[id] || { r: "", n: "", at: "", src: "page", pn: false };
-      b.n = a.n; b.pn = true;
+      b.n = a.n || ""; b.pn = !!b.n;
       if ((a.at || "") > (b.at || "")) b.at = a.at;
-      state[id] = b;
+      if (hasAny(b)) state[id] = b; else delete state[id];
       oursWon = true;
     });
     paintAll(false);
