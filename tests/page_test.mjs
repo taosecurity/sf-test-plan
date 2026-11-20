@@ -158,8 +158,11 @@ try {
     await click(a, 'pass'); await click(a, 'pass'); await sleep(100);   // any save
     check("a stored mark for a step this page doesn't have is kept through a save", (await stored())?.checks?.['998.7']?.n === 'other build');
     const before = await stored();
+    // first question yes (this page), second question no (the other build's marks)
+    await ev(`(()=>{let n=0; return sfTestplan.reset({confirm: (q) => (n++ === 0) || !/doesn't have/.test(q)});})()`); await sleep(100);
+    check("Reset clears this page's steps and keeps another build's mark when told to", (await stored())?.checks?.['998.7']?.n === 'other build' && (await markOf(a)) === '');
     await ev(`sfTestplan.reset({confirm: () => true})`); await sleep(100);
-    check("Reset clears this page's steps but keeps another build's mark", (await stored())?.checks?.['998.7']?.n === 'other build' && (await markOf(a)) === '');
+    check("Reset clears another build's marks too when asked", !(await stored())?.checks?.['998.7']);
     delete before.checks['998.7'];   // put this page's marks back for the rest of the test
     await ev(`localStorage.setItem(sfTestplan.key, ${JSON.stringify(JSON.stringify(before))})`);
     await load(true);

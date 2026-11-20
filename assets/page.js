@@ -12,7 +12,6 @@
   var RESULTS = ["pass", "fail", "skip"];
   var NOTE_DELAY = 600;
   var MAX_NOTE = 20000;
-  var MAX_OTHERS = 200;   /* stored marks kept for step numbers this page doesn't have (newest first) */
 
   var CFG = {};
   try { CFG = JSON.parse(document.getElementById("tp-config").textContent) || {}; } catch (e) { CFG = {}; }
@@ -87,9 +86,7 @@
     dirty = {};
     if (!storageOk) { sayStatus(); return; }
     var keep = Object.create(null);
-    /* keep the newest MAX_OTHERS of them, so marks for steps no build has any more can't fill the storage */
-    Object.keys(others).sort(function (x, y) { return (others[y].at || "") < (others[x].at || "") ? -1 : 1; })
-      .slice(0, MAX_OTHERS).forEach(function (id) { keep[id] = others[id]; });
+    Object.keys(others).forEach(function (id) { keep[id] = others[id]; });
     Object.keys(state).forEach(function (id) { if (hasAny(state[id])) keep[id] = state[id]; });
     try {
       if (Object.keys(keep).length) {
@@ -542,7 +539,11 @@
       return false;
     }
     flushNotes();      /* stop the note timers first, so none of them writes after the reset */
-    state = {};       /* this page's steps only: marks another build saved for steps not on this page stay */
+    state = {};       /* this page's steps */
+    var extra = Object.keys(others).length;
+    if (extra && ask("This plan also has " + extra + " saved mark" + (extra === 1 ? "" : "s") + " for steps this page doesn't have (from another build of run " + RUN + "). Clear " + (extra === 1 ? "it" : "them") + " too?")) {
+      others = Object.create(null);
+    }
     dirty = {};
     paintAll(true);
     writeStore();
