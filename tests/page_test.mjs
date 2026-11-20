@@ -205,6 +205,8 @@ try {
   check('import: a log mark shows "Checked from the log"', (await markOf(d)) === 'pass' && (await liHas(d, 'from-log')) && (await ev(`(document.querySelector('li.check[data-id="${d}"] .logbadge')||{}).textContent`)) === 'Checked from the log');
   check('import: hostile text stays text', (await noteOf(d)) === HOSTILE && m1.includes(HOSTILE) && (await ev(`document.querySelectorAll('img').length`)) === 0);
   check('import: the merged marks are saved', (await stored())?.checks?.[a]?.r === 'skip' && (await stored())?.checks?.[d]?.src === 'log');
+  await typeNote(d, 'looked fine'); await sleep(50);
+  check('typing a note on a log mark keeps it a log mark', (await liHas(d, 'from-log')) && (await markOf(d)) === 'pass' && (await stored())?.checks?.[d]?.src === 'log');
   await click(d, 'pass'); await click(d, 'pass'); await sleep(50);
   check('changing a log mark by hand removes the badge', !(await liHas(d, 'from-log')) && !(await ev(`!!document.querySelector('li.check[data-id="${d}"] .logbadge')`)));
 
@@ -250,6 +252,11 @@ try {
   check('Reset asks first and keeps marks on no', (await markOf(a)) === 'skip');
   dialogAnswer = true; await ev(`document.querySelector('#tools button[data-act="reset"]').click()`); await sleep(100);
   check('Reset clears every mark, note and the stored copy on yes', (await ev(`document.querySelectorAll('.seg input:checked').length`)) === 0 && (await noteOf(a)) === '' && (await stored()) === null && (await openN()) === open0);
+
+  // A malformed address fragment must not stop the page (code review, 2026-11-19)
+  await send('Page.navigate', { url: pageUrl + '#%E0' }); await sleep(600);
+  check('a malformed #fragment in the address leaves the page working', await ev(`!!window.sfTestplan && document.querySelectorAll('.seg').length === ${ids.length}`).catch(() => false));
+  await load(false);
 
   // Everything marked Pass: the tally never goes past its total (code review, 2026-11-19)
   if (hasSmoke) await ev(`document.getElementById('deep') && (document.getElementById('deep').open = true)`);

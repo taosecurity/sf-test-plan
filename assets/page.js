@@ -56,7 +56,9 @@
     var n = typeof v.n === "string" ? v.n.slice(0, MAX_NOTE) : "";
     var at = typeof v.at === "string" ? v.at : "";
     var src = v.src === "log" ? "log" : "page";
-    return { r: r, n: n, at: at, src: src };
+    /* pn: the note was typed by a person here (kept in this browser only, never exported), so a log mark can
+       stay a log mark while the tester's note survives a later log import */
+    return { r: r, n: n, at: at, src: src, pn: v.pn === true };
   }
   function readStore() {
     if (!storageOk) return;
@@ -67,6 +69,7 @@
     try { data = JSON.parse(raw); } catch (e) { data = null; }
     if (!data || typeof data !== "object" || !data.checks || typeof data.checks !== "object") return;
     Object.keys(data.checks).forEach(function (id) {
+      if (!Object.prototype.hasOwnProperty.call(byId, id)) return;   /* only checks on this page */
       var s = sanitizeEntry(data.checks[id]);
       if (s && hasAny(s)) state[id] = s;
     });
@@ -193,7 +196,7 @@
       var s = entry(id);
       s.n = ta.value.slice(0, MAX_NOTE);
       s.at = nowIso();
-      s.src = "page";   /* a person edited it, so it is no longer "from the log" */
+      s.pn = true;      /* a person's note; the mark keeps its own source (page or log) */
       dirty[id] = true;
       paintClasses(id);
       clearTimeout(timer);
@@ -435,6 +438,8 @@
       /* A mark from the log never replaces the tester's own mark or note: a person's Fail beats a log line. */
       if (inc.src === "log" && hasAny(cur) && cur.src !== "log") { res.kept++; return; }
       if (hasAny(cur) && !(timeOf(inc.at) > timeOf(cur.at))) { res.kept++; return; }
+      /* a newer log mark over an older log mark: take the result, keep a note the tester typed */
+      if (inc.src === "log" && cur && cur.src === "log" && cur.pn && cur.n) { inc.n = cur.n; inc.pn = true; }
       state[c.id] = inc;
       res.added++;
     });
@@ -524,8 +529,9 @@
       say("Nothing cleared.");
       return false;
     }
-    pendingNotes = {};
+    flushNotes();      /* stop the note timers first, so none of them writes after the reset */
     state = {};
+    dirty = {};
     paintAll(true);
     writeStore();
     say("Marks and notes cleared.", "ok");
@@ -547,14 +553,20 @@
 
   /* Another tab with the same page changed the marks. */
   window.addEventListener("storage", function (ev) {
-    if (ev.key !== KEY) return;
-    /* Another tab saved, cleared or reset. Its save is the truth, so clears and Reset carry over; only a note
-       typed here and not yet written (dirty) is kept on top of it, and then saved. */
+    if (ev.key !== KEY && ev.key !== null) return;   /* null: all site data was cleared */
+    /* Another tab saved, cleared or reset. Its save is the truth, so marks, clears and Reset carry over; only
+       the note typed here and not yet written (dirty) is laid on top of its entry, and then saved. */
     var mine = state, oursWon = false;
     state = {};
     readStore();
     Object.keys(dirty).forEach(function (id) {
-      if (mine[id]) { state[id] = mine[id]; oursWon = true; }
+      var a = mine[id];
+      if (!a || !a.n) return;
+      var b = state[id] || { r: "", n: "", at: "", src: "page", pn: false };
+      b.n = a.n; b.pn = true;
+      if ((a.at || "") > (b.at || "")) b.at = a.at;
+      state[id] = b;
+      oursWon = true;
     });
     paintAll(false);
     if (oursWon) writeStore();
@@ -563,7 +575,10 @@
 
   /* A link to #deep (or to anything inside it) opens the folded Deep checks box. */
   function openDeepFor(hash) {
-    var d = $("deep"), t = hash && hash.length > 1 ? document.getElementById(decodeURIComponent(hash.slice(1))) : null;
+    if (!hash || hash.length < 2) return;
+    var name = hash.slice(1);
+    try { name = decodeURIComponent(name); } catch (e) { /* a stray % in the address: use it as written */ }
+    var d = $("deep"), t = document.getElementById(name);
     if (d && t && (t === d || d.contains(t))) d.open = true;
   }
   window.addEventListener("hashchange", function () { openDeepFor(location.hash); });
@@ -571,12 +586,12 @@
     var a = ev.target && ev.target.closest ? ev.target.closest('a[href^="#"]') : null;
     if (a) openDeepFor(a.getAttribute("href"));
   });
-  openDeepFor(location.hash);
 
   /* ---------- start ---------- */
   readStore();
   paintAll(true);
   sayStatus();
+  openDeepFor(location.hash);   /* after the marks load, so nothing here can stop them */
 
   /* Test hook (used by tests/page_test.mjs and handy in the console). Read-only views plus the same
      actions the buttons run; nothing here talks to the network. */

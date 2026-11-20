@@ -92,9 +92,9 @@ Exit codes for `check` and `build`: 0 = no errors (warnings allowed), 1 = errors
 - Smoke checks inside `<section id="smoke">`, the rest inside `<details id="deep">` when smoke is set; otherwise groups are `<section class="group" id="g<n>">`.
 - `<code class="cmd">` on spans that match the command pattern (the script adds the Copy button).
 
-The page saves marks in `localStorage` under `sf-test-plan:<run>:<plan>`, where `<plan>` is the `plan` value in tp-config: the first 12 hex digits of the SHA-256 of `title`, `mod` and `run` joined with newlines. Browsers share one storage area for every `file://` page, so this keeps two plans with the same `run` apart, while copies of the same plan (same title, mod and run) share marks. If storage throws, the page keeps marks in memory and says so in `#saved`. When another tab of the same page saves, this page takes that save (so clears and Reset carry over) and keeps only a note typed here that wasn't saved yet.
+The page saves marks in `localStorage` under `sf-test-plan:<run>:<plan>`, where `<plan>` is the `plan` value in tp-config: the first 12 hex digits of the SHA-256 of `mod` (or `title` when there is no `mod`) and `run`, joined with a newline. Browsers share one storage area for every `file://` page, so this keeps two mods' plans with the same `run` apart, while copies of the same plan share marks; editing the title keeps them. If storage throws, the page keeps marks in memory and says so in `#saved`. When another tab of the same page saves (or the browser's site data is cleared), this page takes that save, so marks, clears and Reset carry over; only a note typed here that wasn't saved yet is laid on top of it.
 
-Import merges by id: the newer `at` wins, except that a mark with `src: "log"` never replaces a mark or note the tester made on the page.
+Import merges by id: the newer `at` wins, except that a mark with `src: "log"` never replaces a mark the tester set on the page. A newer log mark may replace an older log mark, but a note the tester typed on that check stays. Typing a note doesn't change where the mark came from.
 
 ## 3. Marks file (`marks.json`)
 

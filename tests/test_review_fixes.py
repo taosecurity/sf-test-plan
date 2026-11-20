@@ -67,6 +67,10 @@ class SecondReviewFixes(unittest.TestCase):
         self.assertRegex(ca["plan"], r"^[0-9a-f]{12}$")
         self.assertNotEqual(ca["plan"], cb["plan"])          # same run, different plans: different storage keys
         self.assertEqual(ca["plan"], cfg(parse.parse_text("# A\nrun: r1\n\n## 1 G\n- [ ] one\n- [ ] two\n"))["plan"])
+        # with a mod: line, fixing a typo in the title keeps the key (and the testers' marks)
+        m1 = cfg(parse.parse_text("# Clean Hit test\nrun: r1\nmod: Clean Hit\n\n## 1 G\n- [ ] one\n"))["plan"]
+        m2 = cfg(parse.parse_text("# Clean Hit tests\nrun: r1\nmod: Clean Hit\n\n## 1 G\n- [ ] one\n"))["plan"]
+        self.assertEqual(m1, m2)
 
     def test_all_smoke_group_keeps_its_intro(self):
         from sftestplan import render
@@ -74,7 +78,8 @@ class SecondReviewFixes(unittest.TestCase):
                              "## 3 Save and load\nUse a save made before installing the mod.\n\n- [ ] Load it.\n  smoke: yes\n")
         h = render.render(p)
         self.assertIn("Use a save made before installing the mod.", h)
-        self.assertIn('class="group-intro"', h)
+        # the step stays the first <div> in .what (the page script reads it as the step text)
+        self.assertIn('<div>Load it.</div><div class="group-intro">', h)
 
     def test_cr_only_line_numbers_after_a_comment(self):
         text = "# T\nrun: a\n\n<!-- two\nlines -->\n## 1 G\n- [ ] one\n## 1 Again\n- [ ] two\n"
