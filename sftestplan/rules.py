@@ -90,7 +90,7 @@ def starter_rules(mod: str, version: str, uses: dict[str, list[tuple[str, str]]]
     Each new rule's `re` is the prefix and the id ("BeaconMod: placed"): a starting point the author edits to match
     the real line. With base (an existing rule file object), its fields and rules are kept as they are, and only ids
     in neither its `expect` nor its `forbid` are added (rules whose id isn't a string are kept but hold no id). A
-    prefix given with base replaces the file's `prefix` (escaped); without one, the file's prefix leads new patterns
+    prefix given with base replaces the file's `prefix` (escaped, keeping the old prefix's leading ^); without one, the file's prefix leads new patterns
     when literal_prefix finds its fixed text, else the tag does. Returns (rule file object, ids added). Raises
     SetupError when base has the wrong shape.
     """
@@ -108,7 +108,10 @@ def starter_rules(mod: str, version: str, uses: dict[str, list[tuple[str, str]]]
         data["expect"] = list(_rule_list(data, "expect", base_name))
         data.setdefault("forbid", [])
         if prefix is not None:
-            data["prefix"] = regex_text(prefix)
+            # Keep the old prefix's leading ^, so a prefix anchored to the start of the line stays anchored.
+            old = data.get("prefix")
+            anchor = "^" if isinstance(old, str) and old.startswith("^") else ""
+            data["prefix"] = anchor + regex_text(prefix)
         else:
             # The file's prefix is a regex. It leads new patterns only when it matches one fixed text;
             # "\\s" or "(A|B)" fall back to the tag.

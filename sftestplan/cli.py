@@ -6,6 +6,7 @@ import datetime as _dt
 import json
 import logging
 import os
+import shutil
 import sys
 import tempfile
 
@@ -132,18 +133,28 @@ def _count(n: int, word: str) -> str:
 
 
 def _same_file(a: str, b: str) -> bool:
-    return os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(b))
+    return os.path.normcase(os.path.realpath(a)) == os.path.normcase(os.path.realpath(b))
 
 
 def _write_atomic(path: str, text: str, fix: str) -> None:
-    """Write text to a temp file in path's folder, then move it over path, so a failed write leaves path as it was."""
+    """Write text to a temp file in path's folder, then move it over path, so a failed write leaves path as it was.
+
+    When path is a symlink, the file it points to is replaced (the link stays), and an existing file keeps its
+    permission bits.
+    """
+    real = os.path.realpath(path)
     tmp = None
     try:
-        fd, tmp = tempfile.mkstemp(prefix=".rules-", suffix=".tmp", dir=os.path.dirname(os.path.abspath(path)))
+        fd, tmp = tempfile.mkstemp(prefix=".rules-", suffix=".tmp", dir=os.path.dirname(real))
         with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
-        os.replace(tmp, path)
+        if os.path.exists(real):
+            shutil.copymode(real, tmp)
+        os.replace(tmp, real)
         tmp = None
+    except UnicodeError as e:
+        raise SetupError(f"can't write {path}: the rule file holds text that can't be saved as UTF-8 ({e.reason}). "
+                         f"Check the --from file for a broken escape such as a lone \\ud800. {fix}")
     except OSError as e:
         raise SetupError(f"can't write {path}: {e.strerror or e}. {fix}")
     finally:
@@ -183,32 +194,41 @@ def cmd_rules(args) -> int:
     mod = plan.mod or os.path.basename(args.plan).split(".")[0]
     data, added = rules.starter_rules(mod, plan.version, uses, prefix=args.prefix, plugins=args.plugin,
                                       base=base, base_name=args.from_file or "the rule file")
+    old_prefix = base.get("prefix") if base is not None else None
+    prefix_changed = base is not None and args.prefix is not None and old_prefix != data["prefix"]
     if base is not None:
         kept = len(uses) - len(added)
         print(f"Already in {args.from_file}: {kept} of the {_count(len(uses), 'id')}.")
-        if not added:
+        if not added and not prefix_changed:
             print("Nothing to add, so nothing was written.")
             return 0
-        old_prefix = base.get("prefix")
-        if args.prefix is not None:
-            if old_prefix != data["prefix"]:
-                print(f"Note: the file's prefix changed from {json.dumps(old_prefix, ensure_ascii=False)} to "
-                      f"{json.dumps(data['prefix'], ensure_ascii=False)} (from --prefix). Rules already in the "
-                      "file are kept as they are.")
-        elif rules.literal_prefix(old_prefix) is None:
-            tag = rules.default_tag(mod) + ":"
-            what = (f"prefix {json.dumps(old_prefix, ensure_ascii=False)} isn't one fixed text"
-                    if isinstance(old_prefix, str) and old_prefix else "has no 'prefix' text")
-            print(f"WARNING: the file's {what}, so the new patterns start with {json.dumps(tag, ensure_ascii=False)} "
-                  "instead. Give --prefix with the text your mod's log lines start with to use that.")
     if os.path.exists(out) and not args.force:
-        hint = "add --force to add the new rules to it" if base is not None and _same_file(out, args.from_file) \
-            else "pick another --out, or add --force to replace it"
+        if base is not None and _same_file(out, args.from_file):
+            hint = "add --force to add the new rules to it" if added else "add --force to update its prefix"
+        else:
+            hint = "pick another --out, or add --force to replace it"
         raise SetupError(f"{out} already exists: {hint}.")
-    for r in data["expect"]:
-        if r.get("id") in added:
-            steps = ", ".join(cid for cid, _ in uses[r["id"]])
-            print(f"New expect rule '{r['id']}' (step {steps}): re {json.dumps(r['re'], ensure_ascii=False)}")
+    if prefix_changed:
+        new = json.dumps(data["prefix"], ensure_ascii=False)
+        if isinstance(old_prefix, str) and old_prefix:
+            print(f"Note: the file's prefix changed from {json.dumps(old_prefix, ensure_ascii=False)} to {new} "
+                  "(from --prefix). Rules already in the file are kept as they are.")
+        else:
+            print(f"Note: set the file's prefix to {new} (from --prefix). Rules already in the file are kept as "
+                  "they are.")
+        if not added:
+            print("No ids were missing, so only the prefix changed.")
+    elif base is not None and args.prefix is None and rules.literal_prefix(old_prefix) is None:
+        tag = rules.default_tag(mod) + ":"
+        what = (f"prefix {json.dumps(old_prefix, ensure_ascii=False)} isn't one fixed text"
+                if isinstance(old_prefix, str) and old_prefix else "has no 'prefix' text")
+        print(f"WARNING: the file's {what}, so the new patterns start with {json.dumps(tag, ensure_ascii=False)} "
+              "instead. Give --prefix with the text your mod's log lines start with to use that.")
+    # The new rules are the last len(added) entries of expect; earlier entries come from the file and may be
+    # anything (strings, numbers), so they are never looked at here.
+    for r in data["expect"][len(data["expect"]) - len(added):]:
+        steps = ", ".join(cid for cid, _ in uses[r["id"]])
+        print(f"New expect rule '{r['id']}' (step {steps}): re {json.dumps(r['re'], ensure_ascii=False)}")
     text = rules.dumps(data)
     _write_atomic(out, text, "The old file, if any, is unchanged. Pick another --out, or check the folder is writable.")
     log.debug("wrote %s (%d bytes, %d new rules)", out, len(text), len(added))

@@ -20,8 +20,8 @@ The new `rules` command starts a papyrus-log-check rule file for you. It reads t
 - `sf-test-plan rules PLAN` writes `<plan name>.logrules.json` with the mod's name, version, plugin and log prefix, and one `expect` rule for each `log:` id. Each rule's `means` names the steps it proves.
 - `--prefix TEXT` sets the text the mod's log lines start with, and `--plugin NAME` sets its plugin files. By default both come from the plan's `mod:` name (`BeaconMod:` and `BeaconMod.esm`).
 - `--from FILE` keeps an existing rule file as it is and adds only the ids that are in neither its `expect` nor its `forbid` list. When nothing is missing, it writes nothing.
-- With `--from`, new patterns start with the file's `prefix` (a `^` or `$` anchor and escaped characters such as `\:` are fine). If the prefix is a pattern rather than one fixed text, the command prints a warning and uses the mod name. `--prefix` with `--from` also updates the file's `prefix`, and `--plugin` with `--from` is refused.
-- The command never replaces a file unless you add `--force`, and it never writes over the plan. It writes to a temporary file first, so a failed write leaves the old file as it was.
+- With `--from`, new patterns start with the file's `prefix` (a `^` or `$` anchor and escaped characters such as `\:` are fine). If the prefix is a pattern rather than one fixed text, the command prints a warning and uses the mod name. `--prefix` with `--from` also updates the file's `prefix` (keeping a leading `^`), even when no id is missing, and `--plugin` with `--from` is refused.
+- The command never replaces a file unless you add `--force`, and it never writes over the plan. It writes to a temporary file first, so a failed write leaves the old file as it was. A replaced file keeps its permissions, and a symbolic link keeps pointing to the updated file.
 - The code is in `sftestplan/rules.py`, so other scripts can make the same rule files from their own list of ids.
 - FORMAT.md section 6 describes the file it writes.
 
