@@ -195,12 +195,12 @@ The file it writes looks like this:
 - A rule for a line that must never appear belongs under `forbid`, so move it there.
 - `--prefix` sets the text your mod's log lines start with. The default is the `mod:` name's letters and digits, then a colon (`BeaconMod:`).
 - `--plugin MyMod.esm` names the mod's plugin file (repeat it for several). The default is the same name with `.esm`.
-- Without `--out`, the file is the plan's name with `.logrules.json` (`Beacon.testplan.md` gives `Beacon.logrules.json`). The command never replaces a file unless you add `--force`.
+- Without `--out`, the file is the plan's name with `.logrules.json` (`Beacon.testplan.md` gives `Beacon.logrules.json`). The command never replaces a file unless you add `--force`, and it refuses a symbolic link as the output: give the real file with `--out`.
 
 When you add steps later, `--from` keeps the rule file you already have and adds only the ids it doesn't hold yet. Add `--force` to write the new rules into that same file.
 
 - The new patterns start with the file's `prefix`. If that prefix is a pattern rather than one fixed text, the command warns you and uses the mod name instead.
-- To fix that, delete the rules it just added, then run it again with `--prefix` and `--force`. `--prefix` sets the text, updates the file's `prefix` (keeping a leading `^`) and adds those rules again. It updates the `prefix` even when no id is missing, and rules already in the file keep their patterns.
+- To fix that, delete the rules it just added, then run it again with `--prefix` and `--force`. `--prefix` sets the text, updates the file's `prefix` (keeping a leading `^` and a trailing `$`) and adds those rules again. It updates the `prefix` even when no id is missing, and rules already in the file keep their patterns.
 - `--plugin` doesn't go with `--from`, because the file keeps its own `plugins` list.
 
 When nothing is missing and the prefix stays the same, it writes nothing:

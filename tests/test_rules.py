@@ -4,6 +4,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import sys
 import tempfile
 import unittest
@@ -68,7 +69,7 @@ class RulesModuleTests(unittest.TestCase):
     def test_starter_rules_shape(self):
         uses = {"loaded": [("1.1", "Start a game.")], "placed": [("2.1", "Drop it."), ("2.3", "Drop it again.")]}
         data, added = rules.starter_rules("Beacon Mod", "0.1.0", uses)
-        self.assertEqual(added, ["loaded", "placed"])
+        self.assertEqual([r["id"] for r in added], ["loaded", "placed"])
         self.assertEqual(data["mod"], "Beacon Mod")
         self.assertEqual(data["version"], "0.1.0")
         self.assertEqual(data["plugins"], ["BeaconMod.esm"])
@@ -95,7 +96,7 @@ class RulesModuleTests(unittest.TestCase):
                 "forbid": [{"id": "boom", "re": "BEACON: boom"}]}
         uses = {"loaded": [("1.1", "a")], "boom": [("1.2", "b")], "new": [("2.1", "c")]}
         data, added = rules.starter_rules("Beacon Mod", "0.1.0", uses, base=base)
-        self.assertEqual(added, ["new"])
+        self.assertEqual([r["id"] for r in added], ["new"])
         self.assertEqual(data["expect"][0], {"id": "loaded", "re": "BEACON: up", "min": 2})
         self.assertEqual(data["expect"][1]["re"], "BEACON: new")   # the file's plain prefix leads new patterns
         self.assertEqual(data["forbid"], base["forbid"])
@@ -134,7 +135,7 @@ class RulesModuleTests(unittest.TestCase):
         base = {"expect": [{"id": ["x"], "re": "a"}, {"id": 5}, {"id": {"k": 1}}, "junk"],
                 "forbid": [{"id": None}]}
         data, added = rules.starter_rules("M", "", {"go": [("1.1", "Go.")]}, base=base)
-        self.assertEqual(added, ["go"])
+        self.assertEqual([r["id"] for r in added], ["go"])
         self.assertEqual(len(data["expect"]), 5)
 
     def test_prefix_replaces_the_base_prefix(self):
@@ -355,8 +356,9 @@ class RulesCommandTests(unittest.TestCase):
         self.assertEqual(cli._default_rules_out("Mod.md"), "Mod.logrules.json")
         self.assertEqual(cli._default_rules_out("Mod.txt"), "Mod.txt.logrules.json")
 
+
 class LastReviewTests(unittest.TestCase):
-    """0.3.0 last review: prefix-only updates, note order, symlinks and modes, odd entries, unwritable text."""
+    """0.3.0 last review: prefix-only updates, note order, odd entries, unwritable text."""
 
     def setUp(self):
         self.d = tempfile.mkdtemp()
@@ -449,52 +451,183 @@ class LastReviewTests(unittest.TestCase):
         write(target, text.replace('"mod": "', '"mod": "\\ud800', 1))
         with open(target, encoding="utf-8") as f:
             before = f.read()
-        code, _, err = run("rules", self.plan, "--from", target, "--force")
+        code, out, err = run("rules", self.plan, "--from", target, "--force")
         self.assertEqual(code, 2)
-        self.assertIn(f"can't write {target}", err)
-        self.assertIn("UTF-8", err)
+        self.assertIn("can't be saved as UTF-8", err)
+        self.assertIn(f"It comes from the --from file {target}", err)
+        self.assertEqual(out, "")                      # checked before anything is printed
         with open(target, encoding="utf-8") as f:
             self.assertEqual(f.read(), before)
         self.assertEqual(sorted(os.listdir(self.d)), ["Beacon.testplan.md", "mine.logrules.json"])
 
-    def test_write_keeps_the_permission_bits(self):
-        target = self._rules()
-        if os.name != "nt":
-            os.chmod(target, 0o640)
-        mode = os.stat(target).st_mode & 0o777
-        with mock.patch("sftestplan.cli.shutil.copymode", wraps=shutil.copymode) as cm:
-            code, _, err = run("rules", self.plan, "--from", target, "--force")
-        self.assertEqual(code, 0, err)
-        self.assertEqual(cm.call_count, 1)
-        self.assertEqual(os.path.realpath(cm.call_args[0][0]), os.path.realpath(target))
-        self.assertEqual(os.stat(target).st_mode & 0o777, mode)
-        self.assertEqual(self._load(target)["expect"][-1]["id"], "restored")
+    def test_text_that_cant_be_utf8_without_from_names_prefix_or_plan(self):
+        target = os.path.join(self.d, "r.json")
+        code, out, err = run("rules", self.plan, "--out", target, "--prefix", "B\ud800:")
+        self.assertEqual(code, 2)
+        self.assertIn(f"It comes from --prefix or the plan {self.plan}", err)
+        self.assertEqual(out, "")
+        self.assertFalse(os.path.exists(target))
 
-    def test_symlink_target_is_replaced_and_the_link_kept(self):
-        real_dir = os.path.join(self.d, "real")
-        os.mkdir(real_dir)
-        real = os.path.join(real_dir, "real.logrules.json")
-        shutil.move(self._rules(), real)
+
+class SimplifyRoundTests(unittest.TestCase):
+    """0.3.0 simplify round: links refused, mode put back after the move, ASCII printing, prefix sameness."""
+
+    def setUp(self):
+        self.d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.d, True)
+        self.plan = os.path.join(self.d, "Beacon.testplan.md")
+        shutil.copy(EXAMPLE, self.plan)
+
+    def _rules(self, name="mine.logrules.json", drop=("restored",), **changes):
+        target = os.path.join(self.d, name)
+        with open(EXAMPLE_RULES, encoding="utf-8") as f:
+            data = json.load(f)
+        data["expect"] = [r for r in data["expect"] if r["id"] not in drop]
+        data.update(changes)
+        write(target, json.dumps(data))
+        return target
+
+    def _load(self, path):
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+
+    # 1, 2: links
+    def test_a_link_is_refused_even_with_force(self):
+        target = self._rules()
+        with open(target, encoding="utf-8") as f:
+            before = f.read()
+        real_islink = os.path.islink
+        with mock.patch("sftestplan.cli.os.path.islink", side_effect=lambda p: p == target or real_islink(p)):
+            code, out, err = run("rules", self.plan, "--from", target, "--force")
+        self.assertEqual(code, 2)
+        self.assertIn(f"{target} is a link; give the real file with --out.", err)
+        with open(target, encoding="utf-8") as f:
+            self.assertEqual(f.read(), before)
+
+    def test_a_real_symlink_is_refused(self):
+        real = self._rules()
         link = os.path.join(self.d, "link.logrules.json")
         try:
             os.symlink(real, link)
         except (OSError, NotImplementedError) as e:
             self.skipTest(f"can't make a symlink here: {e}")
         code, _, err = run("rules", self.plan, "--from", link, "--force")
-        self.assertEqual(code, 0, err)
+        self.assertEqual(code, 2)
+        self.assertIn("is a link", err)
         self.assertTrue(os.path.islink(link))
-        self.assertEqual(self._load(real)["expect"][-1]["id"], "restored")
-        self.assertEqual(sorted(os.listdir(real_dir)), ["real.logrules.json"])
+        self.assertEqual(self._load(real)["expect"][-1]["id"], "placed")
 
-    def test_symlink_to_the_plan_is_refused(self):
-        link = os.path.join(self.d, "plan-link.json")
+    def test_a_dangling_symlink_is_refused(self):
+        link = os.path.join(self.d, "dangling.logrules.json")
         try:
-            os.symlink(self.plan, link)
+            os.symlink(os.path.join(self.d, "gone.json"), link)
         except (OSError, NotImplementedError) as e:
             self.skipTest(f"can't make a symlink here: {e}")
         code, _, err = run("rules", self.plan, "--out", link, "--force")
         self.assertEqual(code, 2)
-        self.assertIn("is the plan itself", err)
+        self.assertIn("is a link", err)
+        self.assertFalse(os.path.exists(os.path.join(self.d, "gone.json")))
+
+    def test_existing_check_counts_a_dangling_link(self):
+        target = os.path.join(self.d, "r.json")
+        with mock.patch("sftestplan.cli.os.path.lexists", side_effect=lambda p: p == target):
+            code, _, err = run("rules", self.plan, "--out", target)
+        self.assertEqual(code, 2)
+        self.assertIn("already exists", err)
+
+    # 3: mode and temp-file cleanup
+    def test_mode_is_put_back_on_the_file_after_the_move(self):
+        target = self._rules()
+        if os.name != "nt":
+            os.chmod(target, 0o640)
+        mode = stat.S_IMODE(os.stat(target).st_mode)
+        with mock.patch("sftestplan.cli.os.chmod", wraps=os.chmod) as ch:
+            code, _, err = run("rules", self.plan, "--from", target, "--force")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(ch.call_args_list, [mock.call(target, mode)])
+        self.assertEqual(stat.S_IMODE(os.stat(target).st_mode), mode)
+        self.assertEqual(self._load(target)["expect"][-1]["id"], "restored")
+
+    def test_new_file_gets_no_chmod(self):
+        target = os.path.join(self.d, "r.json")
+        with mock.patch("sftestplan.cli.os.chmod", wraps=os.chmod) as ch:
+            code, _, err = run("rules", self.plan, "--out", target)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(ch.call_count, 0)
+
+    def test_read_only_temp_file_is_still_removed(self):
+        target = self._rules()
+        real_remove = os.remove
+        calls = []
+
+        def remove_once_fails(p):
+            calls.append(p)
+            if len(calls) == 1:
+                raise PermissionError(13, "Access is denied")
+            real_remove(p)
+
+        with mock.patch("sftestplan.cli.os.replace", side_effect=OSError(13, "Permission denied")), \
+                mock.patch("sftestplan.cli.os.remove", side_effect=remove_once_fails), \
+                mock.patch("sftestplan.cli.os.chmod", wraps=os.chmod) as ch:
+            code, _, err = run("rules", self.plan, "--from", target, "--force")
+        self.assertEqual(code, 2)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(ch.call_args_list, [mock.call(calls[0], stat.S_IWRITE)])
+        self.assertEqual(sorted(os.listdir(self.d)), ["Beacon.testplan.md", "mine.logrules.json"])
+
+    # 4: printing is ASCII
+    def test_non_ascii_text_is_printed_escaped(self):
+        p = os.path.join(self.d, "Uni.testplan.md")
+        write(p, "# P\nrun: p-1\nmod: Uni\n\n## 1 G\n- [ ] Do it.\n  log: café\n")
+        target = os.path.join(self.d, "u.json")
+        code, out, err = run("rules", p, "--out", target, "--prefix", "ÉTÉ:")
+        self.assertEqual(code, 0, err)
+        self.assertTrue(out.isascii(), out)
+        self.assertIn("New expect rule 'caf\\u00e9'", out)
+        self.assertIn('re "\\u00c9T\\u00c9: caf\\u00e9"', out)
+        self.assertEqual(self._load(target)["expect"][0]["re"], "ÉTÉ: café")
+
+    # 5: a prefix that already means the same text is unchanged
+    def test_escaped_old_prefix_with_the_same_text_is_unchanged(self):
+        target = self._rules(drop=(), prefix="^BCN\\:")
+        before = os.path.getmtime(target)
+        code, out, _ = run("rules", self.plan, "--from", target, "--prefix", "BCN:", "--force")
+        self.assertEqual(code, 0)
+        self.assertIn("Nothing to add", out)
+        self.assertNotIn("Note:", out)
+        self.assertEqual(os.path.getmtime(target), before)
+        self.assertEqual(self._load(target)["prefix"], "^BCN\\:")
+
+    def test_prefix_keeps_both_anchors(self):
+        go = {"go": [("1.1", "Go.")]}
+        data, _ = rules.starter_rules("M", "", go, prefix="NEW:", base={"prefix": "^OLD:$"})
+        self.assertEqual(data["prefix"], "^NEW:$")
+        data, _ = rules.starter_rules("M", "", go, prefix="NEW:", base={"prefix": "OLD\\$"})
+        self.assertEqual(data["prefix"], "NEW:")
+        data, _ = rules.starter_rules("M", "", go, prefix="OLD:", base={"prefix": "^OLD\\:$"})
+        self.assertEqual(data["prefix"], "^OLD\\:$")
+
+    # 6: the printed list comes from what starter_rules added
+    def test_starter_rules_returns_the_new_rules(self):
+        base = {"expect": [{"id": "a", "re": "x"}], "forbid": []}
+        data, added = rules.starter_rules("M", "", {"a": [("1.1", "A.")], "b": [("1.2", "B.")]}, base=base)
+        self.assertEqual(added, [{"id": "b", "re": "M: b", "means": "Step 1.2: B."}])
+        self.assertIs(added[0], data["expect"][-1])
+
+    def test_printed_rules_are_the_added_ones_not_the_tail_of_expect(self):
+        target = os.path.join(self.d, "r.json")
+        real = rules.starter_rules
+
+        def add_then_append(*a, **k):
+            data, added = real(*a, **k)
+            data["expect"].append({"id": "loaded", "re": "tail"})   # an entry after the new ones
+            return data, added
+
+        with mock.patch("sftestplan.cli.rules.starter_rules", side_effect=add_then_append):
+            code, out, err = run("rules", self.plan, "--out", target)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out.count("New expect rule"), 3)
+        self.assertNotIn('"tail"', out)
 
 
 if __name__ == "__main__":

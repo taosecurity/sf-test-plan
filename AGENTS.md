@@ -77,9 +77,10 @@ It prints `examples/Beacon.testplan.md: 3 groups, 6 checks, 5 smoke; 0 errors, 0
 
   New patterns start with the file's `prefix`. If it prints a WARNING that the prefix isn't one fixed text, the
   rules it just added start with the mod name instead: delete those rules from the file, then rerun with
-  `--prefix "MYMOD:"` and `--force`. That writes the file's `prefix` (keeping a leading `^`) and adds the deleted
-  rules again with the right start; it writes the new `prefix` even when no id is missing. Rules you didn't delete
-  keep their patterns. `--plugin` with `--from` is refused (exit 2): edit the file's `plugins` list instead.
+  `--prefix "MYMOD:"` and `--force`. That writes the file's `prefix` (keeping a leading `^` and a trailing `$`)
+  and adds the deleted rules again with the right start; it writes the new `prefix` even when no id is missing.
+  Rules you didn't delete keep their patterns. `--plugin` with `--from` is refused (exit 2): edit the file's
+  `plugins` list instead. A symbolic link as the output is refused (exit 2): give the real file with `--out`.
 
 - Start a new test round for a new build: change the plan's `run:` line (for example `my-mod-0.1.1`) and build again.
   The page then starts with empty marks.
@@ -100,7 +101,7 @@ Run `check` after every edit and fix what it reports before building.
 | `check` | the plan; `--rules` file if given | nothing |
 | `import` | a marks file; the plan; the results file | `<plan>.results.json` (new row first) |
 | `logs` | a papyrus-log-check JSON report; the plan | a marks file (`--out`, default `<report>.marks.json`) |
-| `rules` | the plan; the `--from` rule file if given | a rule file (`--out`, default the `--from` file, else `<plan name>.logrules.json`; refuses to replace a file without `--force`, and never writes over the plan); writes nothing when no id is missing |
+| `rules` | the plan; the `--from` rule file if given | a rule file (`--out`, default the `--from` file, else `<plan name>.logrules.json`; refuses to replace a file without `--force`, never writes over the plan, and refuses a symbolic link as the output); writes nothing when no id is missing |
 | `new` | nothing | the starter plan (refuses to replace a file without `--force`) |
 
 `<plan>.results.json` means the plan's name without `.md`, plus `.results.json`

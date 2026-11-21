@@ -25,6 +25,16 @@ def regex_text(s: str) -> str:
     return _REGEX_SPECIAL.sub(r"\\\1", s)
 
 
+def _split_anchors(rx: str) -> tuple[str, str, str]:
+    """rx as (leading "^" or "", the text between, trailing "$" or ""). An escaped "\\$" at the end is text."""
+    start = "^" if rx.startswith("^") else ""
+    s = rx[len(start):]
+    end = ""
+    if s.endswith("$") and (len(s) - 1 - len(s[:-1].rstrip("\\"))) % 2 == 0:
+        s, end = s[:-1], "$"
+    return start, s, end
+
+
 def literal_prefix(rx: object) -> str | None:
     """The one fixed text a rule file's `prefix` regex matches, or None when it can match more than one.
 
@@ -34,11 +44,7 @@ def literal_prefix(rx: object) -> str | None:
     """
     if not isinstance(rx, str):
         return None
-    s = rx[1:] if rx.startswith("^") else rx
-    if s.endswith("$"):
-        backslashes = len(s) - 1 - len(s[:-1].rstrip("\\"))
-        if backslashes % 2 == 0:       # "$" itself, not "\$"
-            s = s[:-1]
+    _, s, _ = _split_anchors(rx)
     out = []
     i = 0
     while i < len(s):
@@ -83,16 +89,20 @@ def _rule_list(data: dict, kind: str, where: str) -> list:
 
 def starter_rules(mod: str, version: str, uses: dict[str, list[tuple[str, str]]], *, prefix: str | None = None,
                   plugins: list[str] | None = None, base: dict | None = None,
-                  base_name: str = "the rule file") -> tuple[dict, list[str]]:
+                  base_name: str = "the rule file") -> tuple[dict, list[dict]]:
     """A papyrus-log-check rule file object with an `expect` rule for every id in uses that it doesn't hold yet.
 
     prefix is the literal text the mod's log lines start with (default: the mod name's letters and digits plus ':').
     Each new rule's `re` is the prefix and the id ("BeaconMod: placed"): a starting point the author edits to match
     the real line. With base (an existing rule file object), its fields and rules are kept as they are, and only ids
-    in neither its `expect` nor its `forbid` are added (rules whose id isn't a string are kept but hold no id). A
-    prefix given with base replaces the file's `prefix` (escaped, keeping the old prefix's leading ^); without one, the file's prefix leads new patterns
-    when literal_prefix finds its fixed text, else the tag does. Returns (rule file object, ids added). Raises
-    SetupError when base has the wrong shape.
+    in neither its `expect` nor its `forbid` are added (rules whose id isn't a string are kept but hold no id).
+
+    A prefix given with base replaces the file's `prefix`, escaped, keeping the old prefix's leading ^ and trailing
+    $; when the old prefix already matches exactly that text (literal_prefix), it is left as it was. Without a
+    prefix, the file's prefix leads new patterns when literal_prefix finds its fixed text, else the tag does.
+
+    Returns (rule file object, the new rules in the order they were added). Raises SetupError when base has the
+    wrong shape.
     """
     tag = default_tag(mod)
     lead = prefix if prefix is not None else tag + ":"
@@ -108,10 +118,12 @@ def starter_rules(mod: str, version: str, uses: dict[str, list[tuple[str, str]]]
         data["expect"] = list(_rule_list(data, "expect", base_name))
         data.setdefault("forbid", [])
         if prefix is not None:
-            # Keep the old prefix's leading ^, so a prefix anchored to the start of the line stays anchored.
+            # Keep the old prefix's anchors, so a prefix anchored to the start (or end) stays anchored, and leave
+            # an old prefix that already means this text ("BCN\\:" for "BCN:") as it is.
             old = data.get("prefix")
-            anchor = "^" if isinstance(old, str) and old.startswith("^") else ""
-            data["prefix"] = anchor + regex_text(prefix)
+            if literal_prefix(old) != prefix:
+                start, _, end = _split_anchors(old) if isinstance(old, str) else ("", "", "")
+                data["prefix"] = start + regex_text(prefix) + end
         else:
             # The file's prefix is a regex. It leads new patterns only when it matches one fixed text;
             # "\\s" or "(A|B)" fall back to the tag.
@@ -126,8 +138,9 @@ def starter_rules(mod: str, version: str, uses: dict[str, list[tuple[str, str]]]
             log.debug("log id %r is already in %s", rid, base_name)
             continue
         pattern = regex_text(lead.rstrip() + " " + rid)
-        data["expect"].append({"id": rid, "re": pattern, "means": _means(steps)})
-        added.append(rid)
+        rule = {"id": rid, "re": pattern, "means": _means(steps)}
+        data["expect"].append(rule)
+        added.append(rule)
         log.debug("log id %r: new expect rule, re %r, from step(s) %s", rid, pattern, ", ".join(c for c, _ in steps))
     return data, added
 

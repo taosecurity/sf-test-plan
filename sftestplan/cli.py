@@ -6,7 +6,7 @@ import datetime as _dt
 import json
 import logging
 import os
-import shutil
+import stat
 import sys
 import tempfile
 
@@ -136,33 +136,49 @@ def _same_file(a: str, b: str) -> bool:
     return os.path.normcase(os.path.realpath(a)) == os.path.normcase(os.path.realpath(b))
 
 
+def _ascii(s: str) -> str:
+    """s for printing: JSON-escaped to ASCII, so no console encoding can fail on it (no quotes added)."""
+    return json.dumps(s)[1:-1]
+
+
+def _remove_temp(tmp: str) -> None:
+    try:
+        os.remove(tmp)
+    except OSError:
+        try:                       # a read-only temp file can't be removed on Windows: clear the flag, try once more
+            os.chmod(tmp, stat.S_IWRITE)
+            os.remove(tmp)
+        except OSError as e:
+            log.debug("couldn't remove the temp file %s: %s", tmp, e)
+
+
 def _write_atomic(path: str, text: str, fix: str) -> None:
     """Write text to a temp file in path's folder, then move it over path, so a failed write leaves path as it was.
 
-    When path is a symlink, the file it points to is replaced (the link stays), and an existing file keeps its
-    permission bits.
+    An existing file's permission bits are put back on the new file after the move. path must not be a link
+    (cmd_rules refuses links before this).
     """
-    real = os.path.realpath(path)
+    try:
+        old_mode = stat.S_IMODE(os.stat(path).st_mode)
+    except OSError:
+        old_mode = None
     tmp = None
     try:
-        fd, tmp = tempfile.mkstemp(prefix=".rules-", suffix=".tmp", dir=os.path.dirname(real))
+        fd, tmp = tempfile.mkstemp(prefix=".rules-", suffix=".tmp", dir=os.path.dirname(os.path.abspath(path)))
         with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
-        if os.path.exists(real):
-            shutil.copymode(real, tmp)
-        os.replace(tmp, real)
+        os.replace(tmp, path)
         tmp = None
-    except UnicodeError as e:
-        raise SetupError(f"can't write {path}: the rule file holds text that can't be saved as UTF-8 ({e.reason}). "
-                         f"Check the --from file for a broken escape such as a lone \\ud800. {fix}")
     except OSError as e:
         raise SetupError(f"can't write {path}: {e.strerror or e}. {fix}")
     finally:
         if tmp is not None:
-            try:
-                os.remove(tmp)
-            except OSError:
-                pass
+            _remove_temp(tmp)
+    if old_mode is not None:
+        try:
+            os.chmod(path, old_mode)
+        except OSError as e:
+            print(f"Note: {path} was written, but its old permissions couldn't be put back ({e.strerror or e}).")
 
 
 def cmd_rules(args) -> int:
@@ -179,12 +195,16 @@ def cmd_rules(args) -> int:
         return _report(plan)
     uses = rules.plan_log_uses(plan)
     n_steps = len({cid for steps in uses.values() for cid, _ in steps})
-    print(f"{args.plan}: {_count(len(uses), 'log id')} on {_count(n_steps, 'step')}")
+    counts = f"{args.plan}: {_count(len(uses), 'log id')} on {_count(n_steps, 'step')}"
     if not uses:
+        print(counts)
         print("No step has a 'log:' line, so there is nothing to write. Add 'log: <id>' under the steps the "
               "mod's log can prove, then run this again.")
         return 0
     out = args.out or (args.from_file if args.from_file else _default_rules_out(args.plan))
+    # Links are never followed: replacing a link's target (or the link) is a surprise either way.
+    if os.path.islink(out):
+        raise SetupError(f"{out} is a link; give the real file with --out.")
     if _same_file(out, args.plan):
         raise SetupError(f"--out {out} is the plan itself. Give the rule file another name, such as "
                          f"{_default_rules_out(args.plan)}.")
@@ -194,6 +214,15 @@ def cmd_rules(args) -> int:
     mod = plan.mod or os.path.basename(args.plan).split(".")[0]
     data, added = rules.starter_rules(mod, plan.version, uses, prefix=args.prefix, plugins=args.plugin,
                                       base=base, base_name=args.from_file or "the rule file")
+    text = rules.dumps(data)
+    try:
+        text.encode("utf-8")
+    except UnicodeError as e:
+        source = (f"the --from file {args.from_file}" if args.from_file
+                  else f"--prefix or the plan {args.plan}")
+        raise SetupError(f"the rule file would hold text that can't be saved as UTF-8 ({e.reason}). It comes from "
+                         f"{source}: look for a broken escape such as a lone \\ud800. Nothing was written.")
+    print(counts)
     old_prefix = base.get("prefix") if base is not None else None
     prefix_changed = base is not None and args.prefix is not None and old_prefix != data["prefix"]
     if base is not None:
@@ -202,16 +231,16 @@ def cmd_rules(args) -> int:
         if not added and not prefix_changed:
             print("Nothing to add, so nothing was written.")
             return 0
-    if os.path.exists(out) and not args.force:
+    if os.path.lexists(out) and not args.force:
         if base is not None and _same_file(out, args.from_file):
             hint = "add --force to add the new rules to it" if added else "add --force to update its prefix"
         else:
             hint = "pick another --out, or add --force to replace it"
         raise SetupError(f"{out} already exists: {hint}.")
     if prefix_changed:
-        new = json.dumps(data["prefix"], ensure_ascii=False)
+        new = json.dumps(data["prefix"])
         if isinstance(old_prefix, str) and old_prefix:
-            print(f"Note: the file's prefix changed from {json.dumps(old_prefix, ensure_ascii=False)} to {new} "
+            print(f"Note: the file's prefix changed from {json.dumps(old_prefix)} to {new} "
                   "(from --prefix). Rules already in the file are kept as they are.")
         else:
             print(f"Note: set the file's prefix to {new} (from --prefix). Rules already in the file are kept as "
@@ -220,16 +249,13 @@ def cmd_rules(args) -> int:
             print("No ids were missing, so only the prefix changed.")
     elif base is not None and args.prefix is None and rules.literal_prefix(old_prefix) is None:
         tag = rules.default_tag(mod) + ":"
-        what = (f"prefix {json.dumps(old_prefix, ensure_ascii=False)} isn't one fixed text"
+        what = (f"prefix {json.dumps(old_prefix)} isn't one fixed text"
                 if isinstance(old_prefix, str) and old_prefix else "has no 'prefix' text")
-        print(f"WARNING: the file's {what}, so the new patterns start with {json.dumps(tag, ensure_ascii=False)} "
+        print(f"WARNING: the file's {what}, so the new patterns start with {json.dumps(tag)} "
               "instead. Give --prefix with the text your mod's log lines start with to use that.")
-    # The new rules are the last len(added) entries of expect; earlier entries come from the file and may be
-    # anything (strings, numbers), so they are never looked at here.
-    for r in data["expect"][len(data["expect"]) - len(added):]:
+    for r in added:
         steps = ", ".join(cid for cid, _ in uses[r["id"]])
-        print(f"New expect rule '{r['id']}' (step {steps}): re {json.dumps(r['re'], ensure_ascii=False)}")
-    text = rules.dumps(data)
+        print(f"New expect rule '{_ascii(r['id'])}' (step {steps}): re {json.dumps(r['re'])}")
     _write_atomic(out, text, "The old file, if any, is unchanged. Pick another --out, or check the folder is writable.")
     log.debug("wrote %s (%d bytes, %d new rules)", out, len(text), len(added))
     print(f"Rule file: {out}. Edit each new 're' to match the line your mod writes, and move a rule for a line "
