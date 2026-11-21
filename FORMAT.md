@@ -142,3 +142,13 @@ Written next to the plan by `import`. Newest round first. `build` shows it as th
 - any listed rule FAIL gives `r: fail`, with the rule ids and status in `n`;
 - otherwise the check gets no entry in the marks file (an empty entry could replace a tester's mark), and the command's printed lines say which rule wasn't seen.
 Marks it writes have `src: "log"`.
+
+## 6. Starter rule file (`rules`)
+
+`sf-test-plan rules` writes a papyrus-log-check rule file (the format is in papyrus-log-check's README). It reads only the plan and, with `--from`, an existing rule file.
+
+- Without `--from`, the file holds `mod` (the plan's `mod:`, or the plan file's name up to its first dot), `version` (the plan's `version:`), `plugins` (`--plugin` names, default `<tag>.esm`), `prefix`, an `expect` list and an empty `forbid` list. `<tag>` is the mod name with only letters and digits kept (`MyMod` if none are left). `prefix` is the `--prefix` text (default `<tag>:`) with regex characters escaped.
+- Each `log:` id, in the order the plan first names it, gets one `expect` rule `{"id", "re", "means"}`. `re` is the prefix text, a space and the id, with regex characters escaped. `means` lists the steps that name the id (`Step 1.1: <step text>`, joined with `; `).
+- With `--from`, every field and rule of that file is kept in its order, and only ids that are in neither its `expect` nor its `forbid` are added to the end of `expect`. New patterns start with the `--prefix` text when it is given. Otherwise they start with the file's `prefix` when that matches one fixed text (plain characters, with regex characters escaped by a backslash), and with `<tag>:` when it doesn't (such as `^(A|B):` or `MyMod:\s`).
+- The output has one top-level field per line and one rule per line. It is UTF-8 with LF line ends.
+- The default output is the `--from` file, or else the plan's path with `.testplan.md` (or `.md`) replaced by `.logrules.json`. An existing file is replaced only with `--force`, and the plan itself is never an output. When no id is missing, or the plan has no `log:` ids, nothing is written and the exit code is 0.

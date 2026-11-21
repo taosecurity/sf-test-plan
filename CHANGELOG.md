@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.3.0 (2026-11-20)
+
+### What's new
+
+The new `rules` command starts a papyrus-log-check rule file for you. It reads the `log:` ids in your plan and writes one rule for each, with a pattern you then edit to match the line your mod writes. When you add steps later, it adds only the rules your file lacks. The page's text also uses the full width of the window now.
+
+### Example
+
+    > sf-test-plan rules examples\Beacon.testplan.md --out Beacon.logrules.json
+    examples\Beacon.testplan.md: 3 log ids on 3 steps
+    New expect rule 'loaded' (step 1.1): re "BeaconMod: loaded"
+    New expect rule 'placed' (step 2.2): re "BeaconMod: placed"
+    New expect rule 'restored' (step 3.1): re "BeaconMod: restored"
+    Rule file: Beacon.logrules.json. Edit each new 're' to match the line your mod writes, and move a rule for a line that must never appear to 'forbid'. Then run: sf-test-plan check examples\Beacon.testplan.md --rules Beacon.logrules.json
+
+### New command: rules
+
+- `sf-test-plan rules PLAN` writes `<plan name>.logrules.json` with the mod's name, version, plugin and log prefix, and one `expect` rule for each `log:` id. Each rule's `means` names the steps it proves.
+- `--prefix TEXT` sets the text the mod's log lines start with, and `--plugin NAME` sets its plugin files. By default both come from the plan's `mod:` name (`BeaconMod:` and `BeaconMod.esm`).
+- `--from FILE` keeps an existing rule file as it is and adds only the ids that are in neither its `expect` nor its `forbid` list. When nothing is missing, it writes nothing.
+- The command never replaces a file unless you add `--force`, and it never writes over the plan.
+- The code is in `sftestplan/rules.py`, so other scripts can make the same rule files from their own list of ids.
+- FORMAT.md section 6 describes the file it writes.
+
+### Changes to the page
+
+- The page no longer limits the width of its text, and its column is wider (76rem instead of 900 pixels).
+
+### Changes to the page test (for developers)
+
+- CI now waits up to 90 seconds for Chrome to start in the page test (`TP_CDP_WAIT: "90"`), because Chrome's first start on a fresh Windows runner sometimes took longer than the default 30 seconds.
+
+### Download
+
+Download `sf-test-plan-0.3.0.zip` below, unpack it and follow the Install steps in the README. It needs Python 3.10 or newer and nothing else.
+
 ## 0.2.0 (2026-11-20)
 
 ### What's new

@@ -8,7 +8,7 @@ import logging
 import os
 import sys
 
-from . import model, parse, render, results
+from . import model, parse, render, results, rules
 from .model import SetupError
 
 log = logging.getLogger("sf-test-plan")
@@ -117,6 +117,72 @@ def cmd_logs(args) -> int:
     return 0
 
 
+def _default_rules_out(plan_path: str) -> str:
+    base = plan_path
+    for ending in (".testplan.md", ".md"):
+        if base.lower().endswith(ending):
+            base = base[:-len(ending)]
+            break
+    return base + ".logrules.json"
+
+
+def _count(n: int, word: str) -> str:
+    return f"{n} {word}" + ("" if n == 1 else "s")
+
+
+def _same_file(a: str, b: str) -> bool:
+    return os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(b))
+
+
+def cmd_rules(args) -> int:
+    if args.prefix is not None and not args.prefix.strip():
+        raise SetupError("--prefix is empty. Give the text your mod's log lines start with, such as --prefix \"MYMOD:\".")
+    plan = parse.parse_file(args.plan)
+    if plan.errors():
+        return _report(plan)
+    uses = rules.plan_log_uses(plan)
+    n_steps = len({cid for steps in uses.values() for cid, _ in steps})
+    print(f"{args.plan}: {_count(len(uses), 'log id')} on {_count(n_steps, 'step')}")
+    if not uses:
+        print("No step has a 'log:' line, so there is nothing to write. Add 'log: <id>' under the steps the "
+              "mod's log can prove, then run this again.")
+        return 0
+    out = args.out or (args.from_file if args.from_file else _default_rules_out(args.plan))
+    if _same_file(out, args.plan):
+        raise SetupError(f"--out {out} is the plan itself. Give the rule file another name, such as "
+                         f"{_default_rules_out(args.plan)}.")
+    base = None
+    if args.from_file:
+        base = results._load_json(args.from_file, "Give the papyrus-log-check rule file (.json).")
+    mod = plan.mod or os.path.basename(args.plan).split(".")[0]
+    data, added = rules.starter_rules(mod, plan.version, uses, prefix=args.prefix, plugins=args.plugin,
+                                      base=base, base_name=args.from_file or "the rule file")
+    if base is not None:
+        kept = len(uses) - len(added)
+        print(f"Already in {args.from_file}: {kept} of the {_count(len(uses), 'id')}.")
+        if not added:
+            print("Nothing to add, so nothing was written.")
+            return 0
+    if os.path.exists(out) and not args.force:
+        hint = "add --force to add the new rules to it" if base is not None and _same_file(out, args.from_file) \
+            else "pick another --out, or add --force to replace it"
+        raise SetupError(f"{out} already exists: {hint}.")
+    for r in data["expect"]:
+        if r.get("id") in added:
+            steps = ", ".join(cid for cid, _ in uses[r["id"]])
+            print(f"New expect rule '{r['id']}' (step {steps}): re {json.dumps(r['re'], ensure_ascii=False)}")
+    text = rules.dumps(data)
+    try:
+        with open(out, "w", encoding="utf-8", newline="\n") as f:
+            f.write(text)
+    except OSError as e:
+        raise SetupError(f"can't write {out}: {e.strerror}. Pick another --out.")
+    log.debug("wrote %s (%d bytes, %d new rules)", out, len(text), len(added))
+    print(f"Rule file: {out}. Edit each new 're' to match the line your mod writes, and move a rule for a line "
+          f"that must never appear to 'forbid'. Then run: sf-test-plan check {args.plan} --rules {out}")
+    return 0
+
+
 def cmd_new(args) -> int:
     if os.path.exists(args.plan) and not args.force:
         raise SetupError(f"{args.plan} already exists. Pick another name, or add --force to replace it.")
@@ -161,6 +227,20 @@ def build_parser() -> argparse.ArgumentParser:
     lg.add_argument("--mod", help="the mod's name in the report, when it holds several")
     lg.add_argument("--out", metavar="FILE", help="marks file (default: <report>.marks.json)")
     lg.set_defaults(func=cmd_logs)
+
+    r = sub.add_parser("rules", parents=[common],
+                       help="write a starter papyrus-log-check rule file from the plan's log: ids")
+    r.add_argument("plan")
+    r.add_argument("--out", metavar="FILE",
+                   help="rule file to write (default: --from's file, else <plan name>.logrules.json)")
+    r.add_argument("--from", dest="from_file", metavar="FILE",
+                   help="an existing rule file: keep its rules and add only the log: ids it lacks")
+    r.add_argument("--prefix", metavar="TEXT",
+                   help="the text the mod's log lines start with (default: the mod name's letters and digits, then ':')")
+    r.add_argument("--plugin", action="append", metavar="NAME",
+                   help="the mod's plugin file, such as MyMod.esm (repeat for several; default <mod name>.esm)")
+    r.add_argument("--force", action="store_true", help="replace or update an existing file")
+    r.set_defaults(func=cmd_rules)
 
     n = sub.add_parser("new", parents=[common], help="write a starter plan")
     n.add_argument("plan")

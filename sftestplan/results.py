@@ -359,8 +359,9 @@ This plan tests {mod} 0.1.0. Start with the smoke test; the deep checks are for 
 <!-- A group is a second-level heading with a number and a title. Text right after the heading is the
      group's introduction. Each "- [ ]" line is one check, and the indented lines under it belong to it:
      Expect says what you should see; "smoke: yes" puts the check in the short smoke test shown first;
-     a log line lists papyrus-log-check rule ids that also prove the check (for example "log: loaded",
-     once your rule file has a rule with that id); a note line is a hint shown under the step. -->
+     a log line lists papyrus-log-check rule ids that also prove the check (for example "log: loaded";
+     "sf-test-plan rules" starts a rule file with a rule for each id); a note line is a hint shown under
+     the step. -->
 
 These checks prove the mod loads.
 

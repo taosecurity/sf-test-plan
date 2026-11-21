@@ -34,13 +34,13 @@ Broken.testplan.md: 3 groups, 6 checks, 5 smoke; 1 errors, 0 warnings
 
 - Open the page in any browser beside the game (or on your phone), and mark each step Pass, Fail or Skip with a note.
 - Your marks stay in that browser. **Export** saves them to a file you can keep, share with a tester, or turn into a results log next to your plan.
-- If your mod writes Papyrus log lines, sf-test-plan can also read a [papyrus-log-check](https://github.com/taosecurity/papyrus-log-check) report and mark the steps the log proves.
+- If your mod writes Papyrus log lines, sf-test-plan can also read a [papyrus-log-check](https://github.com/taosecurity/papyrus-log-check) report and mark the steps the log proves. It can also start the rule file that papyrus-log-check needs, from the steps in your plan.
 - It needs only Python. The page works offline, loads nothing from the internet, and nothing is ever uploaded.
 
 ## Install (two minutes)
 
 1. Install Python 3.11 or newer from [python.org](https://www.python.org/downloads/). On the first screen of the installer, tick **Add python.exe to PATH**. To check that it worked, open a new Command Prompt and type `python --version`. It should print a version number. (sf-test-plan itself needs Python 3.10 or newer, and is tested on 3.10 and 3.13 on Windows and Linux.)
-2. Download `sf-test-plan-0.2.0.zip` from the [releases page](https://github.com/taosecurity/sf-test-plan/releases) and unpack it anywhere.
+2. Download `sf-test-plan-0.3.0.zip` from the [releases page](https://github.com/taosecurity/sf-test-plan/releases) and unpack it anywhere.
 3. Open the unpacked folder in File Explorer, click the address bar at the top, type `cmd` and press Enter. A Command Prompt window opens in that folder, ready for the commands below.
 4. Build the example page with `sf-test-plan build examples\Beacon.testplan.md`, as in the Example above, and open `examples\Beacon.testplan.html` in your browser.
 
@@ -117,6 +117,7 @@ The whole format, every warning and every file sf-test-plan reads or writes are 
 | `sf-test-plan check PLAN [--rules FILE]` | Checks the plan for mistakes without writing anything. With `--rules`, it also checks every `log:` id against a papyrus-log-check rule file. |
 | `sf-test-plan import MARKS --plan PLAN` | Adds a marks file (from the page's Export button) to `<plan>.results.json` as one results row, and prints the tally. Build again to show it on the page. |
 | `sf-test-plan logs REPORT --plan PLAN [--mod NAME] [--out MARKS]` | Reads a papyrus-log-check JSON report and writes marks for the steps with `log:` ids. Import them on the page, or with `import`. |
+| `sf-test-plan rules PLAN [--out FILE] [--from FILE] [--prefix TEXT] [--plugin NAME] [--force]` | Writes a starter papyrus-log-check rule file with a rule for each `log:` id in the plan, or adds the missing ids to the rule file you already have. |
 | `sf-test-plan new PLAN [--mod NAME] [--force]` | Writes a starter plan. |
 
 Every command also takes `--verbose` and `--log FILE`. The exit codes are:
@@ -160,6 +161,51 @@ Marks: logcheck-beacon.marks.json (open the page and use Import, or run: sf-test
 
 See "Papyrus logs" below for how to make the report.
 
+### rules
+
+`rules` starts a papyrus-log-check rule file for you. It writes one `expect` rule for each `log:` id in the plan, with a pattern made from your mod's log prefix and the id, and it notes which step each rule proves:
+
+```
+> sf-test-plan rules examples\Beacon.testplan.md --out Beacon.logrules.json
+examples\Beacon.testplan.md: 3 log ids on 3 steps
+New expect rule 'loaded' (step 1.1): re "BeaconMod: loaded"
+New expect rule 'placed' (step 2.2): re "BeaconMod: placed"
+New expect rule 'restored' (step 3.1): re "BeaconMod: restored"
+Rule file: Beacon.logrules.json. Edit each new 're' to match the line your mod writes, and move a rule for a line that must never appear to 'forbid'. Then run: sf-test-plan check examples\Beacon.testplan.md --rules Beacon.logrules.json
+```
+
+The file it writes looks like this:
+
+```json
+{
+ "mod": "Beacon Mod",
+ "version": "0.1.0",
+ "plugins": ["BeaconMod.esm"],
+ "prefix": "BeaconMod:",
+ "expect": [
+  {"id": "loaded", "re": "BeaconMod: loaded", "means": "Step 1.1: Start a new game and finish the character creator."},
+  {"id": "placed", "re": "BeaconMod: placed", "means": "Step 2.2: Drop the beacon and activate it."},
+  {"id": "restored", "re": "BeaconMod: restored", "means": "Step 3.1: Save, quit to the main menu and load the save."}
+ ],
+ "forbid": []
+}
+```
+
+- The patterns are only a start. Change each `re` to match the line your mod really writes, such as `"re": "BeaconMod: loaded \\d"` for the line "BeaconMod: loaded 0.1.0" (JSON needs each backslash written twice). The papyrus-log-check README explains the patterns.
+- A rule for a line that must never appear belongs under `forbid`, so move it there.
+- `--prefix` sets the text your mod's log lines start with. The default is the `mod:` name's letters and digits, then a colon (`BeaconMod:`).
+- `--plugin MyMod.esm` names the mod's plugin file (repeat it for several). The default is the same name with `.esm`.
+- Without `--out`, the file is the plan's name with `.logrules.json` (`Beacon.testplan.md` gives `Beacon.logrules.json`). The command never replaces a file unless you add `--force`.
+
+When you add steps later, `--from` keeps the rule file you already have and adds only the ids it doesn't hold yet. Add `--force` to write the new rules into that same file. When nothing is missing, it writes nothing:
+
+```
+> sf-test-plan rules examples\Beacon.testplan.md --from examples\Beacon.logrules.json
+examples\Beacon.testplan.md: 3 log ids on 3 steps
+Already in examples\Beacon.logrules.json: 3 of the 3 ids.
+Nothing to add, so nothing was written.
+```
+
 ## The page
 
 - **Pass / Fail / Skip** on each step, and a note box. Click a chosen mark again to clear it.
@@ -171,7 +217,7 @@ See "Papyrus logs" below for how to make the report.
 
 ## Papyrus logs
 
-If your mod logs with `Debug.Trace` and you have a papyrus-log-check rule file for it, run papyrus-log-check on the log first, then give its JSON report to `logs`:
+If you don't have a rule file yet, `sf-test-plan rules` (above) starts one from your plan. If your mod logs with `Debug.Trace` and you have a papyrus-log-check rule file for it, run papyrus-log-check on the log first, then give its JSON report to `logs`:
 
 ```
 python papyrus_log_check.py "<Documents>\My Games\Starfield\Logs\Script\Papyrus.0.log" --rules BeaconMod.logrules.json
@@ -192,7 +238,7 @@ This is what `--verbose` prints for the example plan:
 
 ```
 > sf-test-plan check examples\Beacon.testplan.md --verbose
-[verbose] sf-test-plan 0.2.0, Python 3.13.15, args ['check', 'examples\\Beacon.testplan.md', '--verbose']
+[verbose] sf-test-plan 0.3.0, Python 3.13.15, args ['check', 'examples\\Beacon.testplan.md', '--verbose']
 [verbose] read plan examples\Beacon.testplan.md (1356 characters)
 [verbose] parsed examples\Beacon.testplan.md: title 'Beacon Mod test plan', run 'beacon-0.1.0', 2 setup items, 3 groups, 6 checks (5 smoke), 0 problems
 [verbose]   group 1 'Install and load' (line 13): 1.1 smoke, 1.2 smoke

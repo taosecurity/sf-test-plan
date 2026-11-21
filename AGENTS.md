@@ -1,13 +1,14 @@
 # AGENTS.md: sf-test-plan for AI assistants
 
 Plain steps for an AI assistant helping someone use sf-test-plan. Every command here was run once on sf-test-plan
-0.2.0 before release. The [README](README.md) has the full description and [FORMAT.md](FORMAT.md) the exact formats.
+0.3.0 before release. The [README](README.md) has the full description and [FORMAT.md](FORMAT.md) the exact formats.
 
 ## 1. What it is for
 
 sf-test-plan turns a Markdown test plan (`<Mod>.testplan.md`) into one self-contained HTML checklist page. A tester
 opens the page in a browser, marks each step Pass, Fail or Skip with a note, and exports the marks as JSON. The tool
-can add exported marks to a results file next to the plan, and turn a papyrus-log-check JSON report into marks.
+can add exported marks to a results file next to the plan, turn a papyrus-log-check JSON report into marks, and
+start a papyrus-log-check rule file from the plan's `log:` ids.
 
 Use it when a mod author wants a repeatable, tick-off test plan for a Starfield mod (or any manual test). Don't use
 it for automated tests, and don't treat its results as proof a mod is safe: it records what a person saw.
@@ -20,12 +21,12 @@ it for automated tests, and don't treat its results as proof a mod is safe: it r
 
 ## 3. Install
 
-Download `sf-test-plan-0.2.0.zip` from https://github.com/taosecurity/sf-test-plan/releases and check it against the
+Download `sf-test-plan-0.3.0.zip` from https://github.com/taosecurity/sf-test-plan/releases and check it against the
 `.sha256` file:
 
-    certutil -hashfile sf-test-plan-0.2.0.zip SHA256
+    certutil -hashfile sf-test-plan-0.3.0.zip SHA256
 
-On Linux or macOS: `sha256sum -c sf-test-plan-0.2.0.zip.sha256`. Unpack it anywhere. The commands below run from
+On Linux or macOS: `sha256sum -c sf-test-plan-0.3.0.zip.sha256`. Unpack it anywhere. The commands below run from
 the unpacked folder; `python -I sf_test_plan.py` works everywhere, `.\sf-test-plan.cmd` (Windows, with the `.\`) and
 `./sf-test-plan` (Linux, macOS) are short forms.
 
@@ -60,6 +61,20 @@ It prints `examples/Beacon.testplan.md: 3 groups, 6 checks, 5 smoke; 0 errors, 0
 
   It writes `out/logcheck-20261120-213000.marks.json`. Import that on the page, or with `import`.
 
+- Start a papyrus-log-check rule file from the plan's `log:` ids (writes `MyMod.logrules.json` next to the plan,
+  one `expect` rule per id; it refuses to replace a file without `--force`):
+
+      python -I sf_test_plan.py rules MyMod.testplan.md
+
+  Then edit each new rule's `re` to match the line the mod really writes, move rules for lines that must never
+  appear to `forbid`, and run `check MyMod.testplan.md --rules MyMod.logrules.json`. Use `--prefix "MYMOD:"` when
+  the mod's log prefix isn't its `mod:` name, and `--plugin MyMod.esm` for its plugin file names.
+
+- After adding steps with new `log:` ids, add only the missing rules to the existing rule file (keeps every rule and
+  field already there):
+
+      python -I sf_test_plan.py rules MyMod.testplan.md --from MyMod.logrules.json --force
+
 - Start a new test round for a new build: change the plan's `run:` line (for example `my-mod-0.1.1`) and build again.
   The page then starts with empty marks.
 
@@ -79,6 +94,7 @@ Run `check` after every edit and fix what it reports before building.
 | `check` | the plan; `--rules` file if given | nothing |
 | `import` | a marks file; the plan; the results file | `<plan>.results.json` (new row first) |
 | `logs` | a papyrus-log-check JSON report; the plan | a marks file (`--out`, default `<report>.marks.json`) |
+| `rules` | the plan; the `--from` rule file if given | a rule file (`--out`, default the `--from` file, else `<plan name>.logrules.json`; refuses to replace a file without `--force`, and never writes over the plan); writes nothing when no id is missing |
 | `new` | nothing | the starter plan (refuses to replace a file without `--force`) |
 
 `<plan>.results.json` means the plan's name without `.md`, plus `.results.json`
@@ -100,5 +116,7 @@ when something goes wrong.
   another browser or computer starts empty. Export to move them. A mark imported from `logs` never replaces a
   tester's own mark or note. From 0.2.0 on, a page never writes over marks that a newer sf-test-plan
   saved; it keeps its marks in memory and says to use Export.
+- `rules` only guesses each pattern (the prefix and the id). It can't know the mod's real log lines or which ids
+  are lines that must never appear, so a person must edit the file before trusting its results.
 - It doesn't run the game, read saves, or decide whether a mod works: a person marks the steps, and `logs` marks only
   what the log rules prove.
