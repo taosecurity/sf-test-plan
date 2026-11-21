@@ -80,7 +80,7 @@ It prints `examples/Beacon.testplan.md: 3 groups, 6 checks, 5 smoke; 0 errors, 0
   `--prefix "MYMOD:"` and `--force`. That writes the file's `prefix` (keeping a leading `^` and a trailing `$`)
   and adds the deleted rules again with the right start; it writes the new `prefix` even when no id is missing.
   Rules you didn't delete keep their patterns. `--plugin` with `--from` is refused (exit 2): edit the file's
-  `plugins` list instead. A symbolic link as the output is refused (exit 2): give the real file with `--out`.
+  `plugins` list instead. When something would be written, an output file that is itself a symbolic link is refused (exit 2): give the real file with `--out`. A linked `--from` file with nothing to add still exits 0.
 
 - Start a new test round for a new build: change the plan's `run:` line (for example `my-mod-0.1.1`) and build again.
   The page then starts with empty marks.

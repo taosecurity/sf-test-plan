@@ -195,7 +195,7 @@ The file it writes looks like this:
 - A rule for a line that must never appear belongs under `forbid`, so move it there.
 - `--prefix` sets the text your mod's log lines start with. The default is the `mod:` name's letters and digits, then a colon (`BeaconMod:`).
 - `--plugin MyMod.esm` names the mod's plugin file (repeat it for several). The default is the same name with `.esm`.
-- Without `--out`, the file is the plan's name with `.logrules.json` (`Beacon.testplan.md` gives `Beacon.logrules.json`). The command never replaces a file unless you add `--force`, and it refuses a symbolic link as the output: give the real file with `--out`.
+- Without `--out`, the file is the plan's name with `.logrules.json` (`Beacon.testplan.md` gives `Beacon.logrules.json`). The command never replaces a file unless you add `--force`, and when it would write, it refuses an output file that is itself a symbolic link: give the real file with `--out`.
 
 When you add steps later, `--from` keeps the rule file you already have and adds only the ids it doesn't hold yet. Add `--force` to write the new rules into that same file.
 
