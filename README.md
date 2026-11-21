@@ -197,7 +197,7 @@ The file it writes looks like this:
 - `--plugin MyMod.esm` names the mod's plugin file (repeat it for several). The default is the same name with `.esm`.
 - Without `--out`, the file is the plan's name with `.logrules.json` (`Beacon.testplan.md` gives `Beacon.logrules.json`). The command never replaces a file unless you add `--force`.
 
-When you add steps later, `--from` keeps the rule file you already have and adds only the ids it doesn't hold yet. Add `--force` to write the new rules into that same file. When nothing is missing, it writes nothing:
+When you add steps later, `--from` keeps the rule file you already have and adds only the ids it doesn't hold yet. Add `--force` to write the new rules into that same file. The new patterns start with the file's `prefix`. If that prefix is a pattern rather than one fixed text, the command warns you and uses the mod name instead, and `--prefix` sets the text and updates the file's `prefix` too. `--plugin` doesn't go with `--from`, because the file keeps its own `plugins` list. When nothing is missing, it writes nothing:
 
 ```
 > sf-test-plan rules examples\Beacon.testplan.md --from examples\Beacon.logrules.json

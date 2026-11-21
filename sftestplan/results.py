@@ -33,15 +33,17 @@ def _id_key(cid: str):
     return [(0, int(p), "") if p.isdigit() else (1, 0, p) for p in str(cid).split(".")]
 
 
-def plain_text(md: str) -> str:
-    """Inline Markdown -> plain text (for the "t" field): drops `code`, **bold**, *italic* marks and link targets."""
+def plain_text(md: str, limit: int | None = STEP_TEXT_MAX) -> str:
+    """Inline Markdown -> plain text (for the "t" field): drops `code`, **bold**, *italic* marks and link targets.
+
+    The text is cut to limit characters (ending "...") unless limit is None."""
     s = re.sub(r"\[([^\]]*)\]\((https?://[^)\s]*)\)", r"\1", md or "")
     s = s.replace("`", "")
     s = re.sub(r"\*\*(.+?)\*\*", r"\1", s)
     s = re.sub(r"(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?![\w*])", r"\1", s)
     s = " ".join(s.split())
-    if len(s) > STEP_TEXT_MAX:
-        s = s[:STEP_TEXT_MAX - 3].rstrip() + "..."
+    if limit is not None and len(s) > limit:
+        s = s[:limit - 3].rstrip() + "..."
     return s
 
 

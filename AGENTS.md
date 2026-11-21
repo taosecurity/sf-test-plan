@@ -75,6 +75,10 @@ It prints `examples/Beacon.testplan.md: 3 groups, 6 checks, 5 smoke; 0 errors, 0
 
       python -I sf_test_plan.py rules MyMod.testplan.md --from MyMod.logrules.json --force
 
+  New patterns start with the file's `prefix`; if it prints a WARNING that the prefix isn't one fixed text, rerun
+  with `--prefix "MYMOD:"` (which also updates the file's `prefix`). `--plugin` with `--from` is refused (exit 2):
+  edit the file's `plugins` list instead.
+
 - Start a new test round for a new build: change the plan's `run:` line (for example `my-mod-0.1.1`) and build again.
   The page then starts with empty marks.
 

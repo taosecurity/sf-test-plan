@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import sys
+import tempfile
 
 from . import model, parse, render, results, rules
 from .model import SetupError
@@ -134,9 +135,34 @@ def _same_file(a: str, b: str) -> bool:
     return os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(b))
 
 
+def _write_atomic(path: str, text: str, fix: str) -> None:
+    """Write text to a temp file in path's folder, then move it over path, so a failed write leaves path as it was."""
+    tmp = None
+    try:
+        fd, tmp = tempfile.mkstemp(prefix=".rules-", suffix=".tmp", dir=os.path.dirname(os.path.abspath(path)))
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
+            f.write(text)
+        os.replace(tmp, path)
+        tmp = None
+    except OSError as e:
+        raise SetupError(f"can't write {path}: {e.strerror or e}. {fix}")
+    finally:
+        if tmp is not None:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+
+
 def cmd_rules(args) -> int:
-    if args.prefix is not None and not args.prefix.strip():
-        raise SetupError("--prefix is empty. Give the text your mod's log lines start with, such as --prefix \"MYMOD:\".")
+    if args.prefix is not None:
+        args.prefix = args.prefix.strip()
+        if not args.prefix:
+            raise SetupError("--prefix is empty. Give the text your mod's log lines start with, such as "
+                             "--prefix \"MYMOD:\".")
+    if args.from_file and args.plugin:
+        raise SetupError("--plugin can't be used with --from: --from keeps the rule file's own 'plugins' list. "
+                         "Edit 'plugins' in that file instead, or leave out --from to start a new file.")
     plan = parse.parse_file(args.plan)
     if plan.errors():
         return _report(plan)
@@ -163,6 +189,18 @@ def cmd_rules(args) -> int:
         if not added:
             print("Nothing to add, so nothing was written.")
             return 0
+        old_prefix = base.get("prefix")
+        if args.prefix is not None:
+            if old_prefix != data["prefix"]:
+                print(f"Note: the file's prefix changed from {json.dumps(old_prefix, ensure_ascii=False)} to "
+                      f"{json.dumps(data['prefix'], ensure_ascii=False)} (from --prefix). Rules already in the "
+                      "file are kept as they are.")
+        elif rules.literal_prefix(old_prefix) is None:
+            tag = rules.default_tag(mod) + ":"
+            what = (f"prefix {json.dumps(old_prefix, ensure_ascii=False)} isn't one fixed text"
+                    if isinstance(old_prefix, str) and old_prefix else "has no 'prefix' text")
+            print(f"WARNING: the file's {what}, so the new patterns start with {json.dumps(tag, ensure_ascii=False)} "
+                  "instead. Give --prefix with the text your mod's log lines start with to use that.")
     if os.path.exists(out) and not args.force:
         hint = "add --force to add the new rules to it" if base is not None and _same_file(out, args.from_file) \
             else "pick another --out, or add --force to replace it"
@@ -172,11 +210,7 @@ def cmd_rules(args) -> int:
             steps = ", ".join(cid for cid, _ in uses[r["id"]])
             print(f"New expect rule '{r['id']}' (step {steps}): re {json.dumps(r['re'], ensure_ascii=False)}")
     text = rules.dumps(data)
-    try:
-        with open(out, "w", encoding="utf-8", newline="\n") as f:
-            f.write(text)
-    except OSError as e:
-        raise SetupError(f"can't write {out}: {e.strerror}. Pick another --out.")
+    _write_atomic(out, text, "The old file, if any, is unchanged. Pick another --out, or check the folder is writable.")
     log.debug("wrote %s (%d bytes, %d new rules)", out, len(text), len(added))
     print(f"Rule file: {out}. Edit each new 're' to match the line your mod writes, and move a rule for a line "
           f"that must never appear to 'forbid'. Then run: sf-test-plan check {args.plan} --rules {out}")
@@ -236,9 +270,11 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--from", dest="from_file", metavar="FILE",
                    help="an existing rule file: keep its rules and add only the log: ids it lacks")
     r.add_argument("--prefix", metavar="TEXT",
-                   help="the text the mod's log lines start with (default: the mod name's letters and digits, then ':')")
+                   help="the text the mod's log lines start with (default: the mod name's letters and digits, then "
+                        "':'; with --from, the file's prefix, and --prefix replaces it)")
     r.add_argument("--plugin", action="append", metavar="NAME",
-                   help="the mod's plugin file, such as MyMod.esm (repeat for several; default <mod name>.esm)")
+                   help="the mod's plugin file, such as MyMod.esm (repeat for several; default <mod name>.esm; "
+                        "not with --from, which keeps the file's plugins)")
     r.add_argument("--force", action="store_true", help="replace or update an existing file")
     r.set_defaults(func=cmd_rules)
 

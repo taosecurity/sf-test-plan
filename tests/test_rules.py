@@ -8,6 +8,7 @@ import sys
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
+from unittest import mock
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
@@ -113,6 +114,46 @@ class RulesModuleTests(unittest.TestCase):
         base = {"mod": "M", "prefix": "MY\\.MOD:", "expect": []}
         data, _ = rules.starter_rules("My Mod", "", {"go": [("1.1", "Go.")]}, base=base)
         self.assertEqual(data["expect"][0]["re"], "MY\\.MOD: go")
+
+    def test_base_with_anchored_or_escaped_prefix_keeps_its_text(self):
+        for prefix, want in (("^BCN:", "BCN: go"), ("BCN\\:", "BCN: go"), ("^BCN:$", "BCN: go"),
+                             ("^MY\\.MOD\\:", "MY\\.MOD: go"), ("A\\$", "A\\$ go")):
+            base = {"mod": "M", "prefix": prefix, "expect": []}
+            data, _ = rules.starter_rules("My Mod", "", {"go": [("1.1", "Go.")]}, base=base)
+            self.assertEqual(data["expect"][0]["re"], want, prefix)
+            self.assertEqual(data["prefix"], prefix, "the file's prefix isn't changed")
+
+    def test_literal_prefix(self):
+        self.assertEqual(rules.literal_prefix("^BCN\\:$"), "BCN:")
+        self.assertEqual(rules.literal_prefix("A\\$"), "A$")
+        self.assertEqual(rules.literal_prefix("A\\\\$"), "A\\")
+        for rx in ("", "^", "MyMod:\\s", "^(A|B):", "a.b", "x\\d", 5, None):
+            self.assertIsNone(rules.literal_prefix(rx), rx)
+
+    def test_base_with_non_string_ids(self):
+        base = {"expect": [{"id": ["x"], "re": "a"}, {"id": 5}, {"id": {"k": 1}}, "junk"],
+                "forbid": [{"id": None}]}
+        data, added = rules.starter_rules("M", "", {"go": [("1.1", "Go.")]}, base=base)
+        self.assertEqual(added, ["go"])
+        self.assertEqual(len(data["expect"]), 5)
+
+    def test_prefix_replaces_the_base_prefix(self):
+        base = {"mod": "M", "prefix": "OLD:", "expect": []}
+        data, _ = rules.starter_rules("M", "", {"go": [("1.1", "Go.")]}, prefix="NEW.X:", base=base)
+        self.assertEqual(data["prefix"], "NEW\\.X:")
+        self.assertEqual(data["expect"][0]["re"], "NEW\\.X: go")
+        self.assertEqual(base["prefix"], "OLD:")
+
+    def test_means_is_not_cut_short(self):
+        long_step = "Walk " + "far " * 120 + "end."
+        data, _ = rules.starter_rules("M", "", {"go": [("1.1", rules.plain_text(long_step, None))]})
+        self.assertTrue(data["expect"][0]["means"].endswith("end."))
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "Long.testplan.md")
+            write(p, f"# P\nrun: p-1\nmod: M\n\n## 1 G\n- [ ] {long_step}\n  log: go\n")
+            uses = rules.plan_log_uses(parse.parse_file(p))
+        self.assertGreater(len(uses["go"][0][1]), 300)
+        self.assertTrue(uses["go"][0][1].endswith("end."))
 
     def test_base_wrong_shape(self):
         for base in ([], {"expect": {}}, {"forbid": "x"}):
@@ -230,6 +271,78 @@ class RulesCommandTests(unittest.TestCase):
             data = json.load(f)
         self.assertEqual(data["prefix"], "BEACON:")
         self.assertEqual(data["plugins"], ["Beacon.esm", "BeaconAddon.esm"])
+        self.assertEqual(data["expect"][0]["re"], "BEACON: loaded")
+
+    def _beacon_rules_without_restored(self, **changes):
+        target = os.path.join(self.d, "mine.logrules.json")
+        with open(EXAMPLE_RULES, encoding="utf-8") as f:
+            data = json.load(f)
+        data["expect"] = [r for r in data["expect"] if r["id"] != "restored"]
+        data.update(changes)
+        write(target, json.dumps(data))
+        return target
+
+    def test_failed_write_keeps_the_old_file(self):
+        target = self._beacon_rules_without_restored()
+        with open(target, encoding="utf-8") as f:
+            before = f.read()
+        with mock.patch("sftestplan.cli.os.replace", side_effect=OSError(13, "Permission denied")):
+            code, _, err = run("rules", self.plan, "--from", target, "--force")
+        self.assertEqual(code, 2)
+        self.assertIn("can't write", err)
+        with open(target, encoding="utf-8") as f:
+            self.assertEqual(f.read(), before)
+        self.assertEqual(sorted(os.listdir(self.d)), ["Beacon.testplan.md", "mine.logrules.json"])
+
+    def test_from_with_regex_prefix_warns_that_the_tag_was_used(self):
+        target = self._beacon_rules_without_restored(prefix="^(BeaconMod|BCN):")
+        code, out, err = run("rules", self.plan, "--from", target, "--force")
+        self.assertEqual(code, 0, err)
+        self.assertIn("WARNING", out)
+        self.assertIn("BeaconMod:", out)
+        target2 = self._beacon_rules_without_restored(prefix="^BCN\\:")
+        code, out, err = run("rules", self.plan, "--from", target2, "--force")
+        self.assertEqual(code, 0, err)
+        self.assertNotIn("WARNING", out)
+        with open(target2, encoding="utf-8") as f:
+            self.assertEqual(json.load(f)["expect"][-1]["re"], "BCN: restored")
+
+    def test_from_with_non_string_id_is_not_a_crash(self):
+        with open(EXAMPLE_RULES, encoding="utf-8") as f:
+            data = json.load(f)
+        data["expect"] = [r for r in data["expect"] if r["id"] != "restored"] + [{"id": ["restored"], "re": "x"}]
+        target = os.path.join(self.d, "odd.json")
+        write(target, json.dumps(data))
+        code, out, err = run("rules", self.plan, "--from", target, "--force")
+        self.assertEqual(code, 0, err)
+        self.assertIn("New expect rule 'restored'", out)
+
+    def test_plugin_with_from_is_refused(self):
+        target = self._beacon_rules_without_restored()
+        code, _, err = run("rules", self.plan, "--from", target, "--plugin", "X.esm", "--force")
+        self.assertEqual(code, 2)
+        self.assertIn("--plugin", err)
+        self.assertIn("--from", err)
+        with open(target, encoding="utf-8") as f:
+            self.assertNotIn("X.esm", f.read())
+
+    def test_from_with_prefix_updates_the_file_prefix(self):
+        target = self._beacon_rules_without_restored()
+        code, out, err = run("rules", self.plan, "--from", target, "--prefix", "BCN.X:", "--force")
+        self.assertEqual(code, 0, err)
+        self.assertIn('prefix changed from "BeaconMod: " to "BCN\\\\.X:"', out)
+        with open(target, encoding="utf-8") as f:
+            new = json.load(f)
+        self.assertEqual(new["prefix"], "BCN\\.X:")
+        self.assertEqual(new["expect"][-1]["re"], "BCN\\.X: restored")
+
+    def test_prefix_is_stripped(self):
+        target = os.path.join(self.d, "r.json")
+        code, _, err = run("rules", self.plan, "--out", target, "--prefix", "  BEACON:  ")
+        self.assertEqual(code, 0, err)
+        with open(target, encoding="utf-8") as f:
+            data = json.load(f)
+        self.assertEqual(data["prefix"], "BEACON:")
         self.assertEqual(data["expect"][0]["re"], "BEACON: loaded")
 
     def test_empty_prefix_is_exit_2(self):

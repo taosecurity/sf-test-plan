@@ -25,6 +25,37 @@ def regex_text(s: str) -> str:
     return _REGEX_SPECIAL.sub(r"\\\1", s)
 
 
+def literal_prefix(rx: object) -> str | None:
+    """The one fixed text a rule file's `prefix` regex matches, or None when it can match more than one.
+
+    A leading ^ and a trailing $ are dropped (they only anchor the text), and a backslash before a character that
+    isn't a letter or digit ("\\:", "\\.") stands for that character. Anything else with a regex meaning ("\\s",
+    ".", "(A|B)") gives None, as does an empty or non-string prefix.
+    """
+    if not isinstance(rx, str):
+        return None
+    s = rx[1:] if rx.startswith("^") else rx
+    if s.endswith("$"):
+        backslashes = len(s) - 1 - len(s[:-1].rstrip("\\"))
+        if backslashes % 2 == 0:       # "$" itself, not "\$"
+            s = s[:-1]
+    out = []
+    i = 0
+    while i < len(s):
+        ch = s[i]
+        if ch == "\\":
+            if i + 1 >= len(s) or s[i + 1].isalnum():
+                return None
+            out.append(s[i + 1])
+            i += 2
+            continue
+        if _REGEX_SPECIAL.fullmatch(ch):
+            return None
+        out.append(ch)
+        i += 1
+    return "".join(out) or None
+
+
 def default_tag(mod: str) -> str:
     """The mod name with only letters and digits kept ("Beacon Mod" -> "BeaconMod"); "MyMod" if nothing is left."""
     return re.sub(r"[^A-Za-z0-9]", "", mod or "") or "MyMod"
@@ -35,7 +66,7 @@ def plan_log_uses(plan: Plan) -> dict[str, list[tuple[str, str]]]:
     uses: dict[str, list[tuple[str, str]]] = {}
     for c in plan.checks():
         for rid in c.log:
-            uses.setdefault(rid, []).append((c.id, plain_text(c.step)))
+            uses.setdefault(rid, []).append((c.id, plain_text(c.step, None)))   # `means` keeps the whole step
     return uses
 
 
@@ -58,8 +89,10 @@ def starter_rules(mod: str, version: str, uses: dict[str, list[tuple[str, str]]]
     prefix is the literal text the mod's log lines start with (default: the mod name's letters and digits plus ':').
     Each new rule's `re` is the prefix and the id ("BeaconMod: placed"): a starting point the author edits to match
     the real line. With base (an existing rule file object), its fields and rules are kept as they are, and only ids
-    in neither its `expect` nor its `forbid` are added. Returns (rule file object, ids added). Raises SetupError when
-    base has the wrong shape.
+    in neither its `expect` nor its `forbid` are added (rules whose id isn't a string are kept but hold no id). A
+    prefix given with base replaces the file's `prefix` (escaped); without one, the file's prefix leads new patterns
+    when literal_prefix finds its fixed text, else the tag does. Returns (rule file object, ids added). Raises
+    SetupError when base has the wrong shape.
     """
     tag = default_tag(mod)
     lead = prefix if prefix is not None else tag + ":"
@@ -74,13 +107,16 @@ def starter_rules(mod: str, version: str, uses: dict[str, list[tuple[str, str]]]
         _rule_list(data, "forbid", base_name)
         data["expect"] = list(_rule_list(data, "expect", base_name))
         data.setdefault("forbid", [])
-        if prefix is None and isinstance(data.get("prefix"), str):
-            # The file's prefix is a regex. It leads new patterns only when it matches one fixed text (plain
-            # characters, or special ones escaped the way regex_text does); "\\s" or "(A|B)" fall back to the tag.
-            literal = re.sub(r"\\(.)", r"\1", data["prefix"])
-            if data["prefix"] and regex_text(literal) == data["prefix"]:
+        if prefix is not None:
+            data["prefix"] = regex_text(prefix)
+        else:
+            # The file's prefix is a regex. It leads new patterns only when it matches one fixed text;
+            # "\\s" or "(A|B)" fall back to the tag.
+            literal = literal_prefix(data.get("prefix"))
+            if literal is not None:
                 lead = literal
-    have = {r.get("id") for kind in ("expect", "forbid") for r in data[kind] if isinstance(r, dict)}
+    have = {r["id"] for kind in ("expect", "forbid") for r in data[kind]
+            if isinstance(r, dict) and isinstance(r.get("id"), str)}
     added = []
     for rid, steps in uses.items():
         if rid in have:
