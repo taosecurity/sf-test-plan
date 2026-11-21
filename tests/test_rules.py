@@ -504,6 +504,15 @@ class SimplifyRoundTests(unittest.TestCase):
         with open(target, encoding="utf-8") as f:
             self.assertEqual(f.read(), before)
 
+    def test_a_linked_from_file_with_nothing_to_add_still_exits_0(self):
+        target = self._rules(drop=())
+        real_islink = os.path.islink
+        with mock.patch("sftestplan.cli.os.path.islink", side_effect=lambda p: p == target or real_islink(p)):
+            code, out, err = run("rules", self.plan, "--from", target)
+        self.assertEqual(code, 0, err)
+        self.assertIn("Nothing to add, so nothing was written.", out)
+        self.assertNotIn("is a link", err)
+
     def test_a_real_symlink_is_refused(self):
         real = self._rules()
         link = os.path.join(self.d, "link.logrules.json")

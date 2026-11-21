@@ -202,9 +202,6 @@ def cmd_rules(args) -> int:
               "mod's log can prove, then run this again.")
         return 0
     out = args.out or (args.from_file if args.from_file else _default_rules_out(args.plan))
-    # Links are never followed: replacing a link's target (or the link) is a surprise either way.
-    if os.path.islink(out):
-        raise SetupError(f"{out} is a link; give the real file with --out.")
     if _same_file(out, args.plan):
         raise SetupError(f"--out {out} is the plan itself. Give the rule file another name, such as "
                          f"{_default_rules_out(args.plan)}.")
@@ -231,6 +228,10 @@ def cmd_rules(args) -> int:
         if not added and not prefix_changed:
             print("Nothing to add, so nothing was written.")
             return 0
+    # The output file itself is never a link: replacing a link's target (or the link) is a surprise either way.
+    # Checked only when something will be written, so a linked --from file with nothing to add still exits 0.
+    if os.path.islink(out):
+        raise SetupError(f"{out} is a link; give the real file with --out.")
     if os.path.lexists(out) and not args.force:
         if base is not None and _same_file(out, args.from_file):
             hint = "add --force to add the new rules to it" if added else "add --force to update its prefix"
