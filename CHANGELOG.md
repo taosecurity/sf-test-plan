@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.2 (unreleased)
+## 0.3.2 (2026-11-22)
 
 This release fixes the mod name that `new` and `rules` take from a plan file name, so a dotted name such as `My.Mod.testplan.md` is no longer cut short. It also replaces the sample names in the public tests with made-up ones.
 
