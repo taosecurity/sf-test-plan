@@ -70,6 +70,9 @@ def cmd_build(args) -> int:
         return code
     rows = results.load_results(args.plan)
     out = args.out or _default_out(args.plan)
+    if _same_file(out, args.plan):
+        raise SetupError(f"--out {out} is the plan itself. Give the page another name, such as "
+                         f"{_default_out(args.plan)}.")
     if os.path.isdir(out):
         raise SetupError(f"{out} is a folder, not a page file. Give a file name with --out, such as {out}{os.sep}page.html.")
     html = render.render(plan, rows)
@@ -110,6 +113,10 @@ def cmd_logs(args) -> int:
         return _report(plan)
     report = results._load_json(args.report, "Give the .json report papyrus-log-check wrote.")
     out = args.out or os.path.splitext(args.report)[0] + ".marks.json"
+    for other, what in ((args.plan, "the plan"), (args.report, "the report")):
+        if _same_file(out, other):
+            raise SetupError(f"--out {out} is {what} itself. Give the marks file another name, such as "
+                             f"{os.path.splitext(args.report)[0] + '.marks.json'}.")
     if os.path.isdir(out):     # before any output, so a refused run prints only its error
         raise SetupError(f"{out} is a folder, not a marks file. Give a file name with --out, such as {out}{os.sep}marks.json.")
     marks, lines = results.logs_to_marks(plan, report, args.mod, _now())
@@ -136,20 +143,25 @@ def _default_rules_out(plan_path: str) -> str:
     return _strip_plan_ending(plan_path) + ".logrules.json"
 
 
+_TEXT_ENDINGS = ("txt", "text", "markdown", "mdown", "mkd")
+
+
 def _mod_from_path(path: str) -> str:
     """The mod name a plan's file name gives ("Beacon.testplan.md" -> "Beacon", "My.Mod.testplan.md" -> "My.Mod";
-    0.3.2 keeps dots that are part of the name). A name with another ending loses only its last extension
-    ("plan.txt" -> "plan"). A file name that isn't valid Unicode (Linux bytes, read as lone surrogates) loses those
+    0.3.2 keeps dots that are part of the name). A plain-text ending (.txt, .text, .markdown, .mdown, .mkd) is
+    removed too ("plan.txt" -> "plan"); any other name stays whole ("Cool.Mod" -> "Cool.Mod"). A file name that isn't valid Unicode (Linux bytes, read as lone surrogates) loses those
     characters, since a plan or rule file is saved as UTF-8 and can't hold them (0.3.1). "My Mod" if nothing is
     left, as in the starter plan."""
     base = os.path.basename(path)
     name = _strip_plan_ending(base)
-    if name == base and "." in base[1:]:
-        name = base.rsplit(".", 1)[0]
-    elif name == base and base.startswith("."):
-        name = ""
+    if name == base:
+        stem, dot, ext = base.rpartition(".")
+        if dot and stem and ext.lower() in _TEXT_ENDINGS:
+            name = stem
+        elif base.startswith("."):
+            name = ""
     kept = " ".join(name.encode("utf-8", "ignore").decode("utf-8").split()) or "My Mod"
-    log.debug("mod name %r from the file name %r (the plan ending is removed; characters that aren't valid Unicode "
+    log.debug("mod name %r from the file name %r (a plan ending, if there is one, is removed; characters that aren't valid Unicode "
               "and extra spaces are left out, and \"My Mod\" is used when nothing is left; give --mod or a mod: "
               "line to set it)", kept, base)
     return kept
@@ -221,6 +233,9 @@ def cmd_rules(args) -> int:
     if plan.errors():
         return _report(plan)
     uses = rules.plan_log_uses(plan)
+    if args.from_file and not args.out and os.path.isdir(args.from_file):
+        raise SetupError(f"--from {args.from_file} is a folder, not a rule file. Give the papyrus-log-check rule "
+                         f"file (.json).")
     out = args.out or (args.from_file if args.from_file else _default_rules_out(args.plan))
     if _same_file(out, args.plan):
         raise SetupError(f"--out {out} is the plan itself. Give the rule file another name, such as "
