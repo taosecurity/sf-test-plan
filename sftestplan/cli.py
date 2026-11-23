@@ -129,6 +129,14 @@ def _default_rules_out(plan_path: str) -> str:
     return base + ".logrules.json"
 
 
+def _mod_from_path(path: str) -> str:
+    """The mod name a plan's file name gives ("Beacon.testplan.md" -> "Beacon"). A file name that isn't valid
+    Unicode (Linux bytes, read as lone surrogates) loses those characters, since a plan or rule file is saved as
+    UTF-8 and can't hold them (0.3.1). Empty is fine: the starters use their own default name."""
+    name = os.path.basename(path).split(".")[0]
+    return name.encode("utf-8", "ignore").decode("utf-8")
+
+
 def _count(n: int, word: str) -> str:
     return f"{n} {word}" + ("" if n == 1 else "s")
 
@@ -209,7 +217,7 @@ def cmd_rules(args) -> int:
     base = None
     if args.from_file:
         base = results._load_json(args.from_file, "Give the papyrus-log-check rule file (.json).")
-    mod = plan.mod or os.path.basename(args.plan).split(".")[0]
+    mod = plan.mod or _mod_from_path(args.plan)
     data, added = rules.starter_rules(mod, plan.version, uses, prefix=args.prefix, plugins=args.plugin,
                                       base=base, base_name=args.from_file or "the rule file")
     text = rules.dumps(data)
@@ -272,8 +280,13 @@ def cmd_rules(args) -> int:
 def cmd_new(args) -> int:
     if os.path.exists(args.plan) and not args.force:
         raise SetupError(f"{args.plan} already exists. Pick another name, or add --force to replace it.")
-    mod = args.mod or os.path.basename(args.plan).split(".")[0]
+    mod = args.mod or _mod_from_path(args.plan)
     text = results.starter_plan(mod)
+    try:
+        text.encode("utf-8")      # checked before the file is opened, so a refused run never empties a plan
+    except UnicodeError as e:
+        raise SetupError(f"--mod holds text that can't be saved as UTF-8 ({e.reason}). Give the mod's name in "
+                         f"plain text. Nothing was written.")
     try:
         with open(args.plan, "w", encoding="utf-8", newline="\n") as f:
             f.write(text)

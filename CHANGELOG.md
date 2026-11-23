@@ -22,7 +22,8 @@ With the old rule file moved away, the same command writes it:
 
 - A file path that isn't valid Unicode (a Linux file name with bytes that aren't UTF-8, or a Windows name with a lone surrogate) no longer breaks `--log`: the log file writes it as `\udcff` instead of printing a "Logging error" for each line.
 - `build` now writes the page for a plan in such a folder. Before, it stopped with "unexpected error" while making the page's storage key. Other folder names get the same key as before, so their pages keep their marks.
-- Paths with characters a cp1252 or ASCII console can't show were already printed safely (with `?`), on stdout and stderr, by every command. Tests now cover that too.
+- `new` and `rules` now take a plan whose file name isn't valid Unicode. Before, `new` stopped with "unexpected error" and left an empty plan behind, and `rules` (on a plan with no `mod:` line) blamed a broken escape in the plan. The mod name now leaves those characters out.
+- Every command already printed any path safely, because its output is always UTF-8 (a character that isn't valid Unicode prints as `?`), even when the console's code page is cp1252 or ASCII. Tests now cover that too.
 - A `rules` run that is refused (the output is a link, or it already exists without `--force`) now prints only the error. Before, it printed the counts and the "Already in" line first, as if it were going to write. A linked `--from` file with nothing to add still prints its counts and "Nothing to add" and exits 0.
 
 ## 0.3.0 (2026-11-20)

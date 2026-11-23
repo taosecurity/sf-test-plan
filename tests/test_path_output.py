@@ -1,15 +1,21 @@
 """0.3.1: a file path a console can't show must not crash any command (NOTES "0.3.0 last review: left for later").
 
-Each command runs as a subprocess whose stdout and stderr are cp1252 or ASCII (PYTHONIOENCODING), on a folder whose
-name holds a character cp1252 can't show and, on Linux, bytes that aren't valid UTF-8 (surrogate escapes). With
---log, the log file must take the same paths without a logging error.
+Each command runs as a subprocess asked for cp1252 or ASCII output (PYTHONIOENCODING), on a folder whose name holds
+a character cp1252 can't show and, on Linux, bytes that aren't valid UTF-8 (surrogate escapes). The tool switches its
+own output to UTF-8 (cli._utf8_output), so the output must decode as UTF-8 and show the path, with each character
+that isn't valid Unicode as '?'. With --log, the log file must take the same paths without a logging error. A second
+set of runs puts the same characters in the plan's own file name (code review of 0.3.1): `new` and `rules` take the
+mod name from it.
 """
+import io
+import json
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ENTRY = os.path.join(ROOT, "sf_test_plan.py")
@@ -19,6 +25,11 @@ REPORT = os.path.join(ROOT, "tests", "fixtures", "logcheck-beacon.json")
 SNOWMAN = "plan-☃"                       # not in cp1252
 # On Linux, the name Python gives a file whose bytes aren't UTF-8; Windows takes the same lone surrogates as a name.
 UNDECODABLE = "plan-\udcff\udcfe"
+
+
+def _shown(name):
+    """How the tool prints a name: UTF-8, with each lone surrogate as '?'."""
+    return name.encode("utf-8", "replace").decode("utf-8")
 
 
 def _can_make(name):
@@ -63,17 +74,65 @@ class PathOutput(unittest.TestCase):
             for name, want, argv in runs:
                 with self.subTest(command=name, encoding=encoding):
                     code, out, err = self._run(encoding, *argv, log=log)
-                    text = (out + err).decode("utf-8", "replace")
+                    text = (out + err).decode("utf-8")    # strict: the output is UTF-8 whatever was asked for
                     self.assertEqual(code, want, text)
                     self.assertNotIn("Traceback", text)
                     self.assertNotIn("unexpected error", text)
                     self.assertNotIn("Logging error", text)
-                    self.assertIn("plan-", text)          # the path was printed, with what the stream couldn't show replaced
+                    self.assertIn(_shown(folder_name), text)   # the path was printed, '?' for what isn't Unicode
             self.assertTrue(os.path.exists(os.path.join(d, "Beacon.testplan.html")))
             self.assertTrue(os.path.exists(marks))
             with open(log, encoding="utf-8") as f:                # the log is valid UTF-8 and names the path
                 logged = f.read()
             self.assertIn("\\udcff\\udcfe" if folder_name == UNDECODABLE else folder_name, logged)
+
+    def _plan_named(self, stem):
+        """`new` and `rules` on a plan whose own file name holds stem; the mod name comes from that name."""
+        with tempfile.TemporaryDirectory() as top:
+            new_plan = os.path.join(top, stem + ".testplan.md")
+            code, out, err = self._run("ascii", "new", new_plan)
+            text = (out + err).decode("utf-8")
+            self.assertEqual(code, 0, text)
+            self.assertNotIn("unexpected error", text)
+            with open(new_plan, encoding="utf-8") as f:            # written in full, as valid UTF-8
+                first = f.readline()
+            self.assertEqual(first, f"# {_shown(stem).replace('?', '')} test plan\n")
+
+            plan = os.path.join(top, stem + "-nomod.testplan.md")  # no mod: line, so rules uses the file name too
+            with open(EXAMPLE, encoding="utf-8") as f:
+                body = "".join(line for line in f if not line.startswith("mod:"))
+            with open(plan, "w", encoding="utf-8") as f:
+                f.write(body)
+            out_file = os.path.join(top, "r.json")
+            code, out, err = self._run("ascii", "rules", plan, "--out", out_file)
+            text = (out + err).decode("utf-8")
+            self.assertEqual(code, 0, text)
+            self.assertNotIn("escape", text)
+            with open(out_file, encoding="utf-8") as f:
+                data = json.load(f)
+            self.assertEqual(data["mod"], _shown(stem).replace("?", "") + "-nomod")
+
+    def test_plan_file_name_unshowable(self):
+        self._plan_named(SNOWMAN)
+
+    @unittest.skipIf(not _can_make(UNDECODABLE), "this file system refuses the name")
+    def test_plan_file_name_undecodable(self):
+        self._plan_named(UNDECODABLE)
+
+    def test_new_mod_not_unicode_is_refused_before_writing(self):
+        sys.path.insert(0, ROOT)
+        from sftestplan import cli
+        with tempfile.TemporaryDirectory() as top:
+            plan = os.path.join(top, "Keep.testplan.md")
+            with open(plan, "w", encoding="utf-8") as f:
+                f.write("old text")
+            err = io.StringIO()
+            with redirect_stdout(io.StringIO()), redirect_stderr(err):
+                code = cli.main(["new", plan, "--force", "--mod", "Bad\udcffName"])
+            self.assertEqual(code, 2)
+            self.assertIn("--mod holds text that can't be saved as UTF-8", err.getvalue())
+            with open(plan, encoding="utf-8") as f:
+                self.assertEqual(f.read(), "old text")             # the existing plan wasn't emptied
 
     def test_unshowable_character_cp1252(self):
         self._every_command(SNOWMAN, "cp1252")
