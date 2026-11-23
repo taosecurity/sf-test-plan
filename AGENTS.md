@@ -97,7 +97,7 @@ Run `check` after every edit and fix what it reports before building.
 
 | Command | Reads | Writes |
 |---|---|---|
-| `build` | the plan; `<plan>.results.json` if present; `--rules` file if given | the page (`--out`, default `<plan>.html`; never the plan or the results file, and refuses an output that is a symbolic link, a read-only file or not a regular file) |
+| `build` | the plan; `<plan>.results.json` if present; `--rules` file if given | the page (`--out`, default `<plan>.html`; never the plan, the results file or the `--rules` file, and refuses an output that is a symbolic link, a read-only file or not a regular file) |
 | `check` | the plan; `--rules` file if given | nothing |
 | `import` | a marks file; the plan; the results file | `<plan>.results.json` (new row first) |
 | `logs` | a papyrus-log-check JSON report; the plan | a marks file (`--out`, default `<report>.marks.json`; never the plan, the report or the results file, and refuses an output that is a symbolic link, a read-only file or not a regular file) |

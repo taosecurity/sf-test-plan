@@ -126,7 +126,7 @@ Every command also takes `--verbose` and `--log FILE`. The exit codes are:
 - **1** means the plan has errors. Each one is printed with its line number and the fix.
 - **2** means a file can't be read or written, or an option is wrong.
 
-`build`, `logs` and `rules` never write over the plan or the plan's results file, and `logs` never writes over its report. They also refuse an output that is a symbolic link, a read-only file or something other than a regular file. In each case the command stops with exit 2, writes nothing, and names the file (from `--out`, `--from` or the default name) and the fix, usually to give another name with `--out`. `rules` checks for a link or a read-only file only when it would write, so a linked `--from` file with nothing to add still exits 0.
+`build`, `logs` and `rules` never write over the plan or the plan's results file, `logs` never writes over its report, and `build` never writes over its `--rules` file. They also refuse an output that is a symbolic link, a read-only file or something other than a regular file. In each case the command stops with exit 2, writes nothing, and names the file (from `--out`, `--from` or the default name) and the fix, usually to give another name with `--out`. The null device (`NUL` on Windows, `/dev/null` elsewhere) is allowed as an output. `rules` checks for a link or a read-only file only when it would write, so a linked `--from` file with nothing to add still exits 0.
 
 ### build and check
 

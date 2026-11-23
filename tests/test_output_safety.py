@@ -111,7 +111,7 @@ class OutputSafety(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertNotIn("Page:", out)
         self.assertIn(f"The default page {page} is a symbolic link, so nothing was written. Give the page another "
-                      f"name with --out, or give the real file with --out.\n", err)
+                      f"name with --out.\n", err)
         self.assertEqual(self.read(page), "keep")
 
     def test_logs_out_that_is_a_link(self):

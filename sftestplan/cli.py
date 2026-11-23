@@ -76,6 +76,8 @@ def cmd_build(args) -> int:
         raise SetupError(f"{given} is the plan itself. {fix}.")
     if _same_file(out, results.results_path(args.plan)):
         raise SetupError(f"{given} is the plan's results file. {fix}.")
+    if args.rules and _same_file(out, args.rules):
+        raise SetupError(f"{given} is the --rules file. {fix}.")
     if os.path.isdir(out):
         raise SetupError(f"{out} is a folder, not a page file. Give a file name with --out, such as {out}{os.sep}page.html.")
     _refuse_unsafe_output(out, given, fix)
@@ -158,7 +160,7 @@ _TEXT_ENDINGS = ("txt", "text", "markdown", "mdown", "mkd")
 def _mod_from_path(path: str) -> str:
     """The mod name a plan's file name gives ("Beacon.testplan.md" -> "Beacon", "My.Mod.testplan.md" -> "My.Mod";
     0.3.2 keeps dots that are part of the name). A plain-text ending (.txt, .text, .markdown, .mdown, .mkd) is
-    removed too ("plan.txt" -> "plan"); any other name stays whole ("Cool.Mod" -> "Cool.Mod"). A name that
+    removed too ("plan.txt" -> "plan", "Beacon.testplan.txt" -> "Beacon"); any other name stays whole ("Cool.Mod" -> "Cool.Mod"). A name that
     starts with a dot (".hidden", ".hidden.txt") gives "My Mod". A file name that isn't valid Unicode (Linux
     bytes, read as lone surrogates) loses those characters, since a plan or rule file is saved as UTF-8 and
     can't hold them (0.3.1). "My Mod" if nothing is left, as in the starter plan."""
@@ -167,7 +169,7 @@ def _mod_from_path(path: str) -> str:
     if name == base:
         stem, dot, ext = base.rpartition(".")
         if dot and stem and ext.lower() in _TEXT_ENDINGS:
-            name = stem
+            name = stem[:-len(".testplan")] if stem.lower().endswith(".testplan") else stem
     if name.startswith("."):
         name = ""
     kept = " ".join(name.encode("utf-8", "ignore").decode("utf-8").split()) or "My Mod"
@@ -193,11 +195,12 @@ def _is_link(name: str) -> bool:
 def _refuse_unsafe_output(out: str, given: str, fix: str) -> None:
     """Refuse an output this command must not write: a symbolic link (writing would change the file it points to,
     or replace the link), or an existing name that isn't a regular file or is read-only. A missing name, or an
-    existing regular file that isn't read-only (OneDrive files included), is fine. Folders get their own message
-    before this is called. Nothing is printed before the error, so a refused run shows only that."""
+    existing regular file that isn't read-only (OneDrive files included), is fine, and so is the null device
+    (NUL, /dev/null). Folders get their own message before this is called. It prints nothing itself."""
+    if os.path.normcase(out) == os.path.normcase(os.devnull):
+        return
     if _is_link(out):
-        raise SetupError(f"{given} is a symbolic link, so nothing was written. {fix}, or give the real file "
-                         f"with --out.")
+        raise SetupError(f"{given} is a symbolic link, so nothing was written. {fix}.")
     if not os.path.lexists(out):
         return
     if not os.path.isfile(out):
@@ -375,7 +378,7 @@ def cmd_new(args) -> int:
         with open(args.plan, "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
     except OSError as e:
-        raise SetupError(f"can't write {args.plan}: {e.strerror}. Check that the folder exists and you can write to it, or pick another name.")
+        raise SetupError(f"can't write {args.plan}: {e.strerror}. Check that the folder exists, that you can write to it and that the file isn't read-only, or pick another name.")
     print(f"Starter plan: {args.plan}. Edit it, then run: sf-test-plan build {args.plan}")
     return 0
 
