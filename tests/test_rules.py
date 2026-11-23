@@ -256,6 +256,23 @@ class RulesCommandTests(unittest.TestCase):
         self.assertIn("nothing to write", out)
         self.assertFalse(os.path.exists(os.path.join(self.d, "Plain.logrules.json")))
 
+    def test_no_log_ids_with_out_as_the_plan_is_refused(self):
+        p = os.path.join(self.d, "Plain.testplan.md")
+        text = "# P\nrun: p-1\n\n## 1 G\n- [ ] Do it.\n"
+        write(p, text)
+        code, _, err = run("rules", p, "--out", p)
+        self.assertEqual(code, 2)
+        self.assertIn("is the plan itself", err)
+        with open(p, encoding="utf-8") as f:
+            self.assertEqual(f.read(), text)
+
+    def test_no_log_ids_with_out_a_folder_is_refused(self):
+        p = os.path.join(self.d, "Plain.testplan.md")
+        write(p, "# P\nrun: p-1\n\n## 1 G\n- [ ] Do it.\n")
+        code, _, err = run("rules", p, "--out", self.d)
+        self.assertEqual(code, 2)
+        self.assertIn("is a folder", err)
+
     def test_plan_errors_are_exit_1(self):
         p = os.path.join(self.d, "Bad.testplan.md")
         write(p, "# P\n\n## 1 G\n- [ ] Do it.\n  log: x\n")
