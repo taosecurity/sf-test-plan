@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.0 (unreleased)
+## 0.4.0 (2026-11-23)
 
 This release adds what a team that keeps many plans needs: a check that the tested zip is the build being released, a table of checks done in the logs, shared New Game+ plans, your own writing rules for `check`, and a `render` command that writes only the part of the page a host page embeds.
 
