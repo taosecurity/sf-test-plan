@@ -198,10 +198,18 @@ def _free_name(default: str, protected, skip_existing: bool = False) -> str:
     """A name for a refusal hint: default, else default with "-2", "-3" ... before its ending, the first that is
     not a protected file. With skip_existing (rules, which refuses an existing output without --force) it must
     not be on disk either, so following the hint never runs into "already exists". build and logs overwrite
-    their output, so their hint keeps the usual default name when it is on disk but not protected."""
+    their output, so their hint keeps the usual default name when it is on disk but not protected, as long as
+    it is a plain file (not a folder or a link) whose file id isn't 0: on a drive that gives every file the id
+    0 a hard link to a protected file can't be seen, so an existing name there is skipped too."""
     def free(name):
-        if skip_existing and os.path.lexists(name):
-            return False
+        if os.path.lexists(name):
+            if skip_existing or os.path.islink(name) or not os.path.isfile(name):
+                return False
+            try:
+                if os.stat(name).st_ino == 0:
+                    return False
+            except (OSError, ValueError):
+                return False
         return not any(_same_file(name, p) for p in protected)
     if free(default):
         return default
