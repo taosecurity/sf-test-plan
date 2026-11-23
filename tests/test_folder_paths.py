@@ -82,6 +82,12 @@ class FolderPaths(unittest.TestCase):
                 self.assertNotIn("already exists", err)
                 self.assertEqual(out, "")
 
+    def test_rules_out_is_a_folder_even_without_log_lines(self):
+        code, out, err = run("rules", self.plan, "--out", self.d)
+        self.assertEqual(code, 2, out + err)
+        self.assertIn("is a folder", err)
+        self.assertEqual(out, "")
+
     def test_new_plan_is_a_folder(self):
         for extra in ([], ["--force"]):
             with self.subTest(extra=extra):

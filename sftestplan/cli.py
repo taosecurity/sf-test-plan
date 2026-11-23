@@ -221,13 +221,6 @@ def cmd_rules(args) -> int:
     if plan.errors():
         return _report(plan)
     uses = rules.plan_log_uses(plan)
-    n_steps = len({cid for steps in uses.values() for cid, _ in steps})
-    counts = f"{args.plan}: {_count(len(uses), 'log id')} on {_count(n_steps, 'step')}"
-    if not uses:
-        print(counts)
-        print("No step has a 'log:' line, so there is nothing to write. Add 'log: <id>' under the steps the "
-              "mod's log can prove, then run this again.")
-        return 0
     out = args.out or (args.from_file if args.from_file else _default_rules_out(args.plan))
     if _same_file(out, args.plan):
         raise SetupError(f"--out {out} is the plan itself. Give the rule file another name, such as "
@@ -235,6 +228,13 @@ def cmd_rules(args) -> int:
     if os.path.isdir(out):
         raise SetupError(f"{out} is a folder, not a rule file. Give a file name with --out, such as "
                          f"{out}{os.sep}rules.json.")
+    n_steps = len({cid for steps in uses.values() for cid, _ in steps})
+    counts = f"{args.plan}: {_count(len(uses), 'log id')} on {_count(n_steps, 'step')}"
+    if not uses:
+        print(counts)
+        print("No step has a 'log:' line, so there is nothing to write. Add 'log: <id>' under the steps the "
+              "mod's log can prove, then run this again.")
+        return 0
     base = None
     if args.from_file:
         base = results._load_json(args.from_file, "Give the papyrus-log-check rule file (.json).")
