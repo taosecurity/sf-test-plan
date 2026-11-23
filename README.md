@@ -126,7 +126,9 @@ Every command also takes `--verbose` and `--log FILE`. The exit codes are:
 - **1** means the plan has errors. Each one is printed with its line number and the fix.
 - **2** means a file can't be read or written, or an option is wrong.
 
-`build`, `logs` and `rules` never write over the plan or the plan's results file, and `logs` never writes over its report. When the output (from `--out`, `--from` or the default name) is one of those files, or a hard link to one, the command stops with exit 2, writes nothing and suggests a name to give with `--out` (never a folder or a link, and for `rules` one that doesn't exist yet). Some network shares, RAM disks and WSL folders (`\\wsl$`) give every file the id 0, so a hard link can't be detected there: on such a drive only the same path is refused, and the suggested name is one that doesn't exist yet.
+`build`, `logs` and `rules` never write over the plan or the plan's results file, and `logs` never writes over its report. When the output (from `--out`, `--from` or the default name) is one of those files, or a hard link to one, the command stops with exit 2, writes nothing and suggests a name to give with `--out` (never a folder or a link; for `build` and `logs` either a new name or a plain file you can write that has no other hard link, and for `rules` one that doesn't exist yet). For all three, an output that is a symbolic link is refused too: give the real file with `--out`.
+
+Some network shares, RAM disks and WSL folders (`\\wsl$`) give every file the id 0, so a hard link can't be detected there: on such a drive only the same path is refused, and the suggested name is one that doesn't exist yet.
 
 ### build and check
 

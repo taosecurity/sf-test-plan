@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
+from types import SimpleNamespace
 from unittest import mock
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -77,20 +78,13 @@ class Round10(unittest.TestCase):
     def test_free_name_skips_an_existing_name_with_file_id_0(self):
         default = os.path.join(self.d, "q.html")
         self.write(default, "x")
-        real_stat = os.stat
+        real_lstat = cli._lstat
 
-        class Zero:
-            def __init__(self, st):
-                self._st = st
-                self.st_ino = 0
-                self.st_dev = st.st_dev
-                self.st_mode = st.st_mode
+        def zero_id(p):                 # only cli's own lookup is replaced (round 11), not the global os.stat
+            st = real_lstat(p)
+            return SimpleNamespace(st_mode=st.st_mode, st_ino=0, st_dev=st.st_dev, st_nlink=1)
 
-        def fake_stat(p, *a, **k):
-            st = real_stat(p, *a, **k)
-            return Zero(st)
-
-        with mock.patch.object(cli.os, "stat", fake_stat):
+        with mock.patch.object(cli, "_lstat", zero_id):
             self.assertEqual(cli._free_name(default, [self.plan]), self.second(default))
 
     def test_free_name_keeps_an_existing_plain_file_with_a_real_id(self):
