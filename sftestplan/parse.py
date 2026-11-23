@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 
 from . import model
@@ -366,6 +367,8 @@ def parse_text(text: str, path: str = "<plan>", rule_ids: set[str] | None = None
 
 
 def _read_text(path: str, what: str) -> str:
+    if os.path.isdir(path):     # Windows reports a folder as "Permission denied", so look first
+        raise SetupError(f"{path} is a folder, not a {what}. Give the file's path.")
     try:
         with open(path, "rb") as f:
             data = f.read()

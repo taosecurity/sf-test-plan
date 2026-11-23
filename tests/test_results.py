@@ -331,9 +331,9 @@ class StarterPlanTests(unittest.TestCase):
                 self.assertFalse(re.match(r"^\s*(#|- \[)", cl), cl)
 
     def test_run_ids(self):
-        cases = {"Beacon Mod": "beacon-mod-0.1.0", "Astrid's  Reloaded!": "astrid-s-reloaded-0.1.0",
+        cases = {"Beacon Mod": "beacon-mod-0.1.0", "Nova's  Beacon!": "nova-s-beacon-0.1.0",
                  "   ": "my-mod-0.1.0", "!!!": "my-mod-0.1.0", "X" * 100: "x" * 58 + "-0.1.0",
-                 "Faction Quest Completion - Ryujin": "faction-quest-completion-ryujin-0.1.0"}
+                 "Crew Quest Completion - Vega": "crew-quest-completion-vega-0.1.0"}
         for mod, want in cases.items():
             run = results._run_id(mod)
             self.assertEqual(run, want, mod)

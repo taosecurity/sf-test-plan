@@ -69,12 +69,12 @@ class SecondReviewFixes(unittest.TestCase):
         self.assertEqual(ca["plan"], cfg(parse.parse_text("# A\nrun: r1\n\n## 1 G\n- [ ] one\n- [ ] two\n"))["plan"])
         # from a file, the key is the file name and run: a title edit keeps it, two plans for one mod differ
         def from_file(name, title):
-            p = parse.parse_text(f"# {title}\nrun: r1\nmod: Astrid Reloaded\n\n## 1 G\n- [ ] one\n",
+            p = parse.parse_text(f"# {title}\nrun: r1\nmod: Nova Beacon\n\n## 1 G\n- [ ] one\n",
                                  path=os.path.join("plans", name))
             return cfg(p)["plan"]
-        self.assertEqual(from_file("Astrid.testplan.md", "Astrid test"), from_file("Astrid.testplan.md", "Astrid tests"))
-        self.assertNotEqual(from_file("Astrid.testplan.md", "Astrid test"),
-                            from_file("AstridRomance.testplan.md", "Astrid Romance test"))
+        self.assertEqual(from_file("Nova.testplan.md", "Nova test"), from_file("Nova.testplan.md", "Nova tests"))
+        self.assertNotEqual(from_file("Nova.testplan.md", "Nova test"),
+                            from_file("NovaDrift.testplan.md", "Nova Drift test"))
         # two testplan.md files in different mod folders differ by mod
         def by_mod(mod):
             p = parse.parse_text(f"# T\nrun: r1\nmod: {mod}\n\n## 1 G\n- [ ] one\n", path=os.path.join(mod, "testplan.md"))
@@ -86,8 +86,8 @@ class SecondReviewFixes(unittest.TestCase):
             return cfg(p)["plan"]
         self.assertNotEqual(no_mod("ModA"), no_mod("ModB"))
         # mod case and spaces don't matter
-        p1 = parse.parse_text("# T\nrun: r1\nmod: Astrid  Reloaded\n\n## 1 G\n- [ ] one\n", path=os.path.join("A", "t.md"))
-        p2 = parse.parse_text("# T\nrun: r1\nmod: astrid reloaded\n\n## 1 G\n- [ ] one\n", path=os.path.join("A", "t.md"))
+        p1 = parse.parse_text("# T\nrun: r1\nmod: Nova  Beacon\n\n## 1 G\n- [ ] one\n", path=os.path.join("A", "t.md"))
+        p2 = parse.parse_text("# T\nrun: r1\nmod: nova beacon\n\n## 1 G\n- [ ] one\n", path=os.path.join("A", "t.md"))
         self.assertEqual(cfg(p1)["plan"], cfg(p2)["plan"])
 
     def test_all_smoke_group_keeps_its_intro(self):

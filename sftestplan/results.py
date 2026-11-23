@@ -52,6 +52,8 @@ def _str(v: object) -> str:
 
 
 def _load_json(path: str, fix: str):
+    if os.path.isdir(path):     # Windows reports a folder as "Permission denied", so look first
+        raise SetupError(f"{path} is a folder, not a file. {fix}")
     try:
         with open(path, "rb") as f:
             raw = f.read()

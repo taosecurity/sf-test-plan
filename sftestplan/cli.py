@@ -71,6 +71,8 @@ def cmd_build(args) -> int:
     rows = results.load_results(args.plan)
     out = args.out or _default_out(args.plan)
     html = render.render(plan, rows)
+    if os.path.isdir(out):
+        raise SetupError(f"{out} is a folder, not a page file. Give a file name with --out, such as {out}{os.sep}page.html.")
     try:
         with open(out, "w", encoding="utf-8", newline="\n") as f:
             f.write(html)
@@ -111,6 +113,8 @@ def cmd_logs(args) -> int:
     for line in lines:
         print(line)
     out = args.out or os.path.splitext(args.report)[0] + ".marks.json"
+    if os.path.isdir(out):
+        raise SetupError(f"{out} is a folder, not a marks file. Give a file name with --out, such as {out}{os.sep}marks.json.")
     try:
         with open(out, "w", encoding="utf-8", newline="\n") as f:
             json.dump(marks, f, indent=1)
@@ -120,24 +124,34 @@ def cmd_logs(args) -> int:
     return 0
 
 
-def _default_rules_out(plan_path: str) -> str:
-    base = plan_path
+def _strip_plan_ending(name: str) -> str:
+    """name without a plan ending: ".testplan.md", else ".md" (either case). Other names stay whole."""
     for ending in (".testplan.md", ".md"):
-        if base.lower().endswith(ending):
-            base = base[:-len(ending)]
-            break
-    return base + ".logrules.json"
+        if name.lower().endswith(ending):
+            return name[:-len(ending)]
+    return name
+
+
+def _default_rules_out(plan_path: str) -> str:
+    return _strip_plan_ending(plan_path) + ".logrules.json"
 
 
 def _mod_from_path(path: str) -> str:
-    """The mod name a plan's file name gives ("Beacon.testplan.md" -> "Beacon"). A file name that isn't valid
-    Unicode (Linux bytes, read as lone surrogates) loses those characters, since a plan or rule file is saved as
-    UTF-8 and can't hold them (0.3.1). "My Mod" if nothing is left, as in the starter plan."""
-    name = os.path.basename(path).split(".")[0]
+    """The mod name a plan's file name gives ("Beacon.testplan.md" -> "Beacon", "My.Mod.testplan.md" -> "My.Mod";
+    0.3.2 keeps dots that are part of the name). A name with another ending loses only its last extension
+    ("plan.txt" -> "plan"). A file name that isn't valid Unicode (Linux bytes, read as lone surrogates) loses those
+    characters, since a plan or rule file is saved as UTF-8 and can't hold them (0.3.1). "My Mod" if nothing is
+    left, as in the starter plan."""
+    base = os.path.basename(path)
+    name = _strip_plan_ending(base)
+    if name == base and "." in base[1:]:
+        name = base.rsplit(".", 1)[0]
+    elif name == base and base.startswith("."):
+        name = ""
     kept = " ".join(name.encode("utf-8", "ignore").decode("utf-8").split()) or "My Mod"
-    if kept != name:
-        log.debug("mod name %r from the file name %r (characters that aren't valid Unicode or spaces are left "
-                  "out, and \"My Mod\" is used when nothing is left; give --mod or a mod: line to set it)", kept, name)
+    log.debug("mod name %r from the file name %r (the plan ending is removed; characters that aren't valid Unicode "
+              "and extra spaces are left out, and \"My Mod\" is used when nothing is left; give --mod or a mod: "
+              "line to set it)", kept, base)
     return kept
 
 
@@ -300,7 +314,7 @@ def cmd_new(args) -> int:
         with open(args.plan, "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
     except OSError as e:
-        raise SetupError(f"can't write {args.plan}: {e.strerror}.")
+        raise SetupError(f"can't write {args.plan}: {e.strerror}. Check that the folder exists and you can write to it, or pick another name.")
     print(f"Starter plan: {args.plan}. Edit it, then run: sf-test-plan build {args.plan}")
     return 0
 

@@ -1,7 +1,7 @@
 # AGENTS.md: sf-test-plan for AI assistants
 
 Plain steps for an AI assistant helping someone use sf-test-plan. Every command here was run once on sf-test-plan
-0.3.1 before release. The [README](README.md) has the full description and [FORMAT.md](FORMAT.md) the exact formats.
+0.3.2 before release. The [README](README.md) has the full description and [FORMAT.md](FORMAT.md) the exact formats.
 
 ## 1. What it is for
 
@@ -21,12 +21,12 @@ it for automated tests, and don't treat its results as proof a mod is safe: it r
 
 ## 3. Install
 
-Download `sf-test-plan-0.3.1.zip` from https://github.com/taosecurity/sf-test-plan/releases and check it against the
+Download `sf-test-plan-0.3.2.zip` from https://github.com/taosecurity/sf-test-plan/releases and check it against the
 `.sha256` file:
 
-    certutil -hashfile sf-test-plan-0.3.1.zip SHA256
+    certutil -hashfile sf-test-plan-0.3.2.zip SHA256
 
-On Linux or macOS: `sha256sum -c sf-test-plan-0.3.1.zip.sha256`. Unpack it anywhere. The commands below run from
+On Linux or macOS: `sha256sum -c sf-test-plan-0.3.2.zip.sha256`. Unpack it anywhere. The commands below run from
 the unpacked folder; `python -I sf_test_plan.py` works everywhere, `.\sf-test-plan.cmd` (Windows, with the `.\`) and
 `./sf-test-plan` (Linux, macOS) are short forms.
 
@@ -108,7 +108,7 @@ Run `check` after every edit and fix what it reports before building.
 (`MyMod.testplan.md` gives `MyMod.testplan.results.json`).
 
 Exit codes: 0 done (warnings allowed); 1 the plan has errors (printed as `file:line: error code: message`); 2 bad
-input or setup (a file can't be read or written, bad JSON, a marks file in another format, a wrong option).
+input or setup (a file can't be read or written, a folder given where a file belongs, bad JSON, a marks file in another format, a wrong option).
 
 Logs: add `--verbose` to print details on stderr, or `--log FILE` to write them to a file. Ask the user for that log
 when something goes wrong.

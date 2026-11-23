@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.3.2 (unreleased)
+
+This release fixes the mod name that `new` and `rules` take from a plan file name, so a dotted name such as `My.Mod.testplan.md` is no longer cut short. It also replaces the sample names in the public tests with made-up ones.
+
+### Example
+
+A plan named `My.Mod.testplan.md` with no `mod:` line now gets its mod name from the file name, dots kept (before, the name was "My"):
+
+    > sf-test-plan rules My.Mod.testplan.md
+    My.Mod.testplan.md: 3 log ids on 3 steps
+    New expect rule 'loaded' (step 1.1): re "MyMod: loaded"
+    New expect rule 'placed' (step 2.2): re "MyMod: placed"
+    New expect rule 'restored' (step 3.1): re "MyMod: restored"
+    Rule file: My.Mod.logrules.json. Edit each new 're' to match the line your mod writes, and move a rule for a line that must never appear to 'forbid'. Then run: sf-test-plan check My.Mod.testplan.md --rules My.Mod.logrules.json
+
+The rule file's `mod` is "My.Mod".
+
+### Fixes
+
+- `new` and `rules` now keep the dots in a plan's file name when they take the mod name from it. Before, `My.Mod.testplan.md` gave the mod name "My". Now it gives "My.Mod", and only the `.testplan.md` or `.md` ending is removed, the same ending the default rule file name drops. Any other ending loses only its last extension (`plan.txt` gives "plan").
+- A folder given where a file belongs (the plan, the marks file, the report, the rule file, or `--out`) now gets "is a folder, not a file" with the fix. On Windows it used to say "Permission denied".
+- `new` in a folder that doesn't exist now says to check that the folder exists and can be written to.
+- `--log` now records the file name and the mod name taken from it on every run.
+- The tests now use made-up mod names as samples, so the release holds no names of private projects.
+
 ## 0.3.1 (2026-11-22)
 
 ### Example
