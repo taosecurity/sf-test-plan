@@ -222,6 +222,35 @@ class BuildsTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("X.dll: differs", out)
 
+    def test_dll_only_report_says_files(self):
+        a = self.zip("a.zip", {"SFSE/Plugins/X.dll": b"D1"})
+        b = self.zip("b.zip", {"SFSE/Plugins/X.dll": b"D2"})
+        self.assertIn("DIFFERENT: 1 of 1 files differ.", self.compare(a, b)[1])
+        self.assertIn("OK: the built zip has the same files as the tested zip.", self.compare(a, a)[1])
+
+    # ---- loose scripts next to a plugin
+    def test_loose_script_change_differs(self):
+        a = self.zip("a.zip", {"Data/Mod.esm": b"E", "Data/Scripts/ModQuest.pex": pex(b"body one", 1)})
+        b = self.zip("b.zip", {"Data/Mod.esm": b"E", "Data/Scripts/ModQuest.pex": pex(b"body two", 1)})
+        code, out, _ = self.compare(a, b)
+        self.assertEqual(code, 1, out)
+        self.assertIn("Data/Scripts/ModQuest.pex: differs", out)
+        self.assertIn("DIFFERENT: 1 of 2 files differ.", out)
+
+    def test_loose_script_recompiled_is_same(self):
+        a = self.zip("a.zip", {"Data/Mod.esm": b"E", "Data/Scripts/ModQuest.pex": pex(b"body", 1)})
+        b = self.zip("b.zip", {"Data/Mod.esm": b"E", "Data/Scripts/ModQuest.pex": pex(b"body", 999)})
+        code, out, _ = self.compare(a, b)
+        self.assertEqual(code, 0, out)
+        self.assertIn("OK: the built zip has the same plugins and scripts as the tested zip.", out)
+
+    def test_loose_script_only_in_one(self):
+        a = self.zip("a.zip", {"Data/Mod.esm": b"E"})
+        b = self.zip("b.zip", {"Data/Mod.esm": b"E", "Data/Scripts/New.pex": pex(b"x", 1)})
+        code, out, _ = self.compare(a, b)
+        self.assertEqual(code, 1)
+        self.assertIn("Data/Scripts/New.pex: only in built", out)
+
     def test_both_empty(self):
         a = self.zip("a.zip", {})
         b = self.zip("b.zip", {})

@@ -32,7 +32,7 @@ def ngplus_link_ok(value: str) -> bool:
     """An ngplus: value is an http(s) address or a relative path: never another scheme (javascript:, data:, a
     drive letter such as C:), a protocol-relative //host, or empty."""
     v = value.strip()
-    if not v or any(ch in v for ch in "\"<>\x00") or v.startswith(("//", "\\\\")):
+    if not v or any(ch in v for ch in "\"<>\x00") or v.replace("\\", "/").startswith("//"):
         return False
     if re.match(r"^https?://\S+$", v, re.I):
         return True

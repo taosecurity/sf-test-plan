@@ -279,7 +279,7 @@ def logs_to_marks(plan: Plan, report: dict, mod: str | None, now: str) -> tuple[
     if not log_checks and not log_only:
         lines.append("The plan has no checks with log: ids, so there is nothing to mark.")
     elif not log_checks:
-        lines.append("No page check has log: ids, so no marks were written. The Log checks are below.")
+        lines.append("No page check has log: ids, so the marks file has no marks. The Log checks are below.")
     for c in log_checks:
         found = [rid for rid in c.log if rid in rules]
         missing = [rid for rid in c.log if rid not in rules]

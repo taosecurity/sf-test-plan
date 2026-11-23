@@ -97,6 +97,15 @@ class StyleRules(unittest.TestCase):
                 self.assertIn(iso, found[0].message)
                 self.assertEqual(found[0].line, 18)
 
+    def test_impossible_date_gets_no_impossible_fix(self):
+        for written in ("Feb 31, 2026", "2/31/2026"):
+            with self.subTest(written=written):
+                text = GOOD.replace("one lantern is there.", f"one lantern is there on {written}.")
+                _, found = _run(R(iso_dates=True), text)
+                self.assertEqual(_codes(found), ["style-date"])
+                self.assertNotIn("2026-02-31", found[0].message)
+                self.assertIn("YYYY-MM-DD", found[0].message)
+
     def test_dates_skip_iso_versions_and_code(self):
         text = GOOD.replace("one lantern is there.", "one lantern 1.2.3 is there on 2026-11-23 (`11/23/2026`).")
         _, found = _run(R(iso_dates=True), text)

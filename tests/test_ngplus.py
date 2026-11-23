@@ -119,7 +119,8 @@ class ParseTests(unittest.TestCase):
         self.assertIn('href="https://example.com/ng.html?a=1&amp;b=2"', render.render(p))
 
     def test_bad_links_refused(self):
-        for bad in ("javascript:alert(1)", "data:text/html,x", "C:\\Pages\\ng.html", "//evil.example/x", "a\"b"):
+        for bad in ("javascript:alert(1)", "data:text/html,x", "C:\\Pages\\ng.html", "//evil.example/x", "a\"b",
+                    "\\/evil.example/x", "/\\evil.example/x", "\\\\evil.example\\x"):
             p = parse.parse_text(LANTERN.replace("NewGamePlus.testplan.html", bad))
             self.assertIn("bad-ngplus", codes(p), bad)
             self.assertNotIn("ngplus-link", render.render(p), bad)
@@ -243,6 +244,17 @@ class CommandTests(unittest.TestCase):
             self.assertEqual(code, 2, text)
             self.assertIn("order", err, text)
             self.assertFalse(os.path.exists(self.out), text)
+
+    def test_base_log_check_id_clash_is_exit_2(self):
+        # the base's Log check pins 3.1, which the first mod's New Game+ group gets
+        with open(self.files["base"], "w", encoding="utf-8") as f:
+            f.write(BASE.replace("  log: no-errors", "  log: no-errors\n  id: 3.1"))
+        code, out, err = self.ngplus("lantern")
+        self.assertEqual(code, 2, out + err)
+        self.assertIn("L.<n>", err)
+        self.assertNotIn("unexpected error", err)
+        self.assertFalse(os.path.exists(self.out))
+        self.assertFalse(os.path.exists(self.order))
 
     def test_nothing_written_on_plan_errors(self):
         with open(self.files["beacon"], "w", encoding="utf-8") as f:

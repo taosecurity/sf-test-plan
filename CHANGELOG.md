@@ -6,7 +6,7 @@ This release adds what a team that keeps many plans needs: a check that the test
 
 ### What's new
 
-- `compare-builds <tested> <built>` and `check-build <plan> --built <zip>` say whether two mod zips hold the same plugins. A plugin file is compared by checksum, and a `.ba2` by what is inside it, with each Papyrus script compared by what it does (a recompile of the same source matches). Exit 0 means the same, 1 different, 2 bad input. `--json` prints the result, and `--pins FILE` accepts a known pair of differences as a warning.
+- `compare-builds <tested> <built>` and `check-build <plan> --built <zip>` say whether two mod zips hold the same plugins and scripts. A plugin file is compared by checksum, and a `.ba2` by what is inside it. Each Papyrus script, loose or inside an archive, is compared by what it does (a recompile of the same source matches). Exit 0 means the same, 1 different, 2 bad input. `--json` prints the result, and `--pins FILE` accepts a known pair of differences as a warning.
 - A `## Log checks` section holds checks that someone does in the logs after play. The page shows them as a table with no Pass or Fail control, outside the tally. A `logcheck:` line on a check adds "Check in the log:" under it. `build --rules` adds a table of what each log line in the rule file means.
 - A `## New Game+` section holds a mod's New Game+ checks and leaves them off its page. The `ngplus:` header line links the shared page, and `sf-test-plan ngplus` writes the shared plan, with group numbers fixed by an order file.
 - `check`, `build` and `render` take `--style FILE` (format `sf-test-plan-style/1`): smoke count, ISO dates, full sentences and banned words, each with its fix. `examples\style.json` is a sample.
@@ -19,12 +19,12 @@ Two zips of a made-up mod, where the new one has a different plugin file, and an
 
     > sf-test-plan compare-builds BeaconMod-0.1.0.zip BeaconMod-0.1.1.zip
     BeaconMod.esm: differs: the tested zip's copy has sha256 b24d0704d411a3ed, and the built zip's copy has d31fc532bc45d48d
-    DIFFERENT: 1 of 1 plugin files differ.
+    DIFFERENT: 1 of 1 files differ.
 
     > sf-test-plan compare-builds BeaconMod-0.1.0.zip BeaconMod-0.1.1.zip --pins pins.json
     BeaconMod.esm: pinned: rebuilt with the same content
     WARNING: BeaconMod.esm differs, but the --pins file allows this exact pair: rebuilt with the same content
-    OK: the built zip has the same plugins as the tested zip.
+    OK: the built zip has the same plugins and scripts as the tested zip.
 
 The first run exits 1 and the second exits 0. The README has the same example with the pins file, and the other new commands.
 

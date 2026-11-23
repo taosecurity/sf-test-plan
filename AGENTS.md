@@ -82,7 +82,7 @@ It prints `examples/Beacon.testplan.md: 3 groups, 6 checks, 5 smoke; 0 errors, 0
   Rules you didn't delete keep their patterns. `--plugin` with `--from` is refused (exit 2): edit the file's
   `plugins` list instead. When something would be written, an output file that is a symbolic link, read-only or not a regular file is refused (exit 2): give another name with `--out`. A linked `--from` file with nothing to add still exits 0.
 
-- Check that the zip that was tested is the build about to be released (exit 0 same plugins, 1 different, 2 bad
+- Check that the zip that was tested is the build about to be released (exit 0 same plugins and scripts, 1 different, 2 bad
   input; `--json` prints JSON, `--pins pins.json` accepts a known pair of differences, shown as a warning):
 
       python -I sf_test_plan.py compare-builds Tested-0.1.0.zip Built-0.1.0.zip
@@ -144,7 +144,7 @@ Run `check` after every edit and fix what it reports before building.
 and `Beacon.logrules.json`, and a plan named `Cool.Mod.txt` gives the mod name "Cool.Mod" but the
 files `Cool.Mod.txt.html`, `Cool.Mod.txt.logrules.json` and `Cool.Mod.txt.results.json`.
 
-Exit codes: 0 done (warnings allowed; `--help` always exits 0; `compare-builds` and `check-build`: the plugins are the same); 1 the plan has errors (printed as `file:line: error code: message`; `compare-builds` and `check-build`: the plugins differ); 2 bad
+Exit codes: 0 done (warnings allowed; `--help` always exits 0; `compare-builds` and `check-build`: the plugins and scripts are the same); 1 the plan has errors (printed as `file:line: error code: message`; `compare-builds` and `check-build`: they differ); 2 bad
 input or setup (a file can't be read or written, a folder given where a file belongs, bad JSON, a marks file in another format, a wrong option).
 
 Logs: add `--verbose` to print details on stderr, or `--log FILE` to write them to a file. Ask the user for that log

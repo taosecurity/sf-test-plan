@@ -120,15 +120,15 @@ The whole format, every warning and every file sf-test-plan reads or writes are 
 | `sf-test-plan rules PLAN [--out FILE] [--from FILE] [--prefix TEXT] [--plugin NAME] [--force]` | Writes a starter papyrus-log-check rule file with a rule for each `log:` id in the plan, or adds the missing ids to the rule file you already have. |
 | `sf-test-plan new PLAN [--mod NAME] [--force]` | Writes a starter plan. |
 | `sf-test-plan render PLAN [--fragment] [--out FILE] [--assets DIR] [--force]` | Writes the page, or with `--fragment` only the part a host page embeds. See "render" below. |
-| `sf-test-plan compare-builds TESTED BUILT [--pins FILE] [--json]` | Says whether two mod zips hold the same plugins. |
-| `sf-test-plan check-build PLAN --built ZIP [--tested ZIP] [--pins FILE] [--json]` | Says whether the plan's tested zip holds the same plugins as a new build. |
+| `sf-test-plan compare-builds TESTED BUILT [--pins FILE] [--json]` | Says whether two mod zips hold the same plugins and scripts. |
+| `sf-test-plan check-build PLAN --built ZIP [--tested ZIP] [--pins FILE] [--json]` | Says whether the plan's tested zip holds the same plugins and scripts as a new build. |
 | `sf-test-plan ngplus --base FILE --order FILE --out FILE PLAN...` | Writes one shared New Game+ plan from several mods' plans. |
 
 Every command also takes `--verbose` and `--log FILE`. The exit codes are:
 
 | Exit code | Meaning |
 |---|---|
-| 0 | The command finished. Warnings are fine. `--help` always exits 0. For `compare-builds` and `check-build`, 0 also means the two zips have the same plugins. |
+| 0 | The command finished. Warnings are fine. `--help` always exits 0. For `compare-builds` and `check-build`, 0 also means the two zips have the same plugins and scripts. |
 | 1 | The plan has errors (each one is printed with its line number and the fix). For `compare-builds` and `check-build`, 1 means the zips differ. |
 | 2 | A file can't be read or written, or an option is wrong. |
 
@@ -244,12 +244,12 @@ Marks saved on the full page are found on the fragment, and the other way round.
 
 ### compare-builds and check-build
 
-After a test round, these say whether the zip you tested is the build you are about to release. `compare-builds` compares the plugin files in two zips (a `.esm`, `.esp` or `.esl` by checksum, and each `.ba2` by what is inside it, so a different archive packing alone is not a difference). A Papyrus script (`.pex`) inside an archive is compared by what it does, so recompiling the same source, which gives the script a new compile time and a new order of its names, is not a difference either. The exit code is 0 when they match and 1 when they differ:
+After a test round, these say whether the zip you tested is the build you are about to release. `compare-builds` compares the plugin files in two zips (a `.esm`, `.esp` or `.esl` by checksum, and each `.ba2` by what is inside it, so a different archive packing alone is not a difference). A zip with no plugin, such as a DLL-only mod, has every file compared. Loose Papyrus scripts (`.pex` files outside an archive) are compared too. A script, inside an archive or loose, is compared by what it does, so recompiling the same source, which gives the script a new compile time and a new order of its names, is not a difference either. The exit code is 0 when they match and 1 when they differ:
 
 ```
 > sf-test-plan compare-builds BeaconMod-0.1.0.zip BeaconMod-0.1.1.zip
 BeaconMod.esm: differs: the tested zip's copy has sha256 b24d0704d411a3ed, and the built zip's copy has d31fc532bc45d48d
-DIFFERENT: 1 of 1 plugin files differ.
+DIFFERENT: 1 of 1 files differ.
 ```
 
 `--json` prints the result as JSON (format `sf-test-plan-compare/1`). `--pins FILE` names differences you have looked at and accepted. The pins file is JSON, with each plugin's lower-case file name and the first 16 hex digits of the two checksums that the report printed. Only that exact pair is accepted, and it is shown as a warning:
@@ -263,7 +263,7 @@ DIFFERENT: 1 of 1 plugin files differ.
 > sf-test-plan compare-builds BeaconMod-0.1.0.zip BeaconMod-0.1.1.zip --pins pins.json
 BeaconMod.esm: pinned: rebuilt with the same content
 WARNING: BeaconMod.esm differs, but the --pins file allows this exact pair: rebuilt with the same content
-OK: the built zip has the same plugins as the tested zip.
+OK: the built zip has the same plugins and scripts as the tested zip.
 ```
 
 `check-build` does the same with the zip named by the plan's `zip:` line (relative to the plan's folder, or give `--tested`) and a new build given with `--built`:

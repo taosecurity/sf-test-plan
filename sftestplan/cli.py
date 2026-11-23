@@ -534,7 +534,7 @@ def cmd_check_build(args) -> int:
               f"{args.built}. " + " ".join(result["problems"]) +
               " Rebuild the test zip from the current build, or give the plan a new run: and zip:.")
         return 1
-    print("OK: the built zip has the same plugins as the tested zip.")
+    print(builds.ok_line(result))
     return 0
 
 
@@ -575,6 +575,11 @@ def cmd_ngplus(args) -> int:
         seen[name] = p.path
     text, new_order, summary = ngplus.shared_plan(base, plans, order)
     check = parse.parse_text(text, args.out)
+    dups = [e for e in check.errors() if e.code == "dup-id"]
+    if dups:   # a base Log check pins an id such as 5.1 that a mod's new group also uses
+        raise SetupError(f"the shared plan would use a check id twice: {dups[0].message} A Log check in the base "
+                         f"plan {args.base} pins an id that a mod's New Game+ group gets. Give that Log check an "
+                         "id of the form L.<n>. Nothing was written.")
     if check.errors():   # the shared plan is made from plans with no errors, so this is a bug in sf-test-plan
         raise RuntimeError("the shared plan it made has errors: " + "; ".join(e.message for e in check.errors()))
     if new_order != order:
@@ -671,7 +676,7 @@ def build_parser() -> argparse.ArgumentParser:
     pins_help = ("JSON file (format sf-test-plan-pins/1) of known, accepted differences: a plugin whose two sha256 "
                  "values match its pin exactly is a warning, not a difference")
     cb = sub.add_parser("compare-builds", parents=[common],
-                        help="check that two mod zips have the same plugins (exit 0 same, 1 different)")
+                        help="check that two mod zips have the same plugins and scripts (exit 0 same, 1 different)")
     cb.add_argument("tested", help="the zip that was tested")
     cb.add_argument("built", help="the zip of the current build")
     cb.add_argument("--pins", metavar="FILE", help=pins_help)
@@ -679,7 +684,7 @@ def build_parser() -> argparse.ArgumentParser:
     cb.set_defaults(func=cmd_compare_builds)
 
     ck = sub.add_parser("check-build", parents=[common],
-                        help="check that the plan's tested zip has the same plugins as a new build")
+                        help="check that the plan's tested zip has the same plugins and scripts as a new build")
     ck.add_argument("plan")
     ck.add_argument("--built", required=True, metavar="ZIP", help="the zip of the current build")
     ck.add_argument("--tested", metavar="ZIP",

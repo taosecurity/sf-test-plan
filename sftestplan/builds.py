@@ -3,7 +3,7 @@
 Read only. Plugin entries (.esm, .esp, .esl, .ba2) are compared by CRC-32 and size first. A .ba2 that differs is
 copied, one at a time, to a temporary file and opened: each file inside is compared by its unpacked content, and a
 .pex script is compared by meaning (pex.listing: compile time and string-table order ignored), so a recompile of the
-same source still matches. A script that listing() can't read is compared by its bytes with the compile time zeroed. When neither zip has a plugin (a DLL-only zip), every file entry is compared instead.
+same source still matches. A loose .pex next to a plugin is compared the same way. A script that listing() can't read is compared by its bytes with the compile time zeroed. When neither zip has a plugin (a DLL-only zip), every file entry is compared instead.
 """
 from __future__ import annotations
 
@@ -47,14 +47,39 @@ def _open_zip(path: str, which: str) -> zipfile.ZipFile:
 
 
 def zip_entries(zf: zipfile.ZipFile, every_file: bool = False) -> dict:
-    """{name (lower case, forward slashes): ZipInfo} for the plugin entries (every file entry with every_file)."""
+    """{name (lower case, forward slashes): ZipInfo} for the plugin entries and loose .pex scripts (every file
+    entry with every_file)."""
     out = {}
     for info in zf.infolist():
         name = info.filename.replace("\\", "/")
-        if info.is_dir() or not (every_file or name.lower().endswith(PLUGIN_EXTS)):
+        if info.is_dir() or not (every_file or name.lower().endswith(PLUGIN_EXTS + (".pex",))):
             continue
         out[name.lower()] = info
     return out
+
+
+def _has_plugin(entries: dict) -> bool:
+    return any(k.endswith(PLUGIN_EXTS) for k in entries)
+
+
+def _pex_digest(h, data: bytes, name: str) -> str:
+    """Add a script to the hash by meaning (pex.listing), or by its bytes with the compile time zeroed."""
+    try:
+        h.update("\n".join(pex.listing(data)).encode("utf-8"))   # by meaning: string-table order ignored
+        return h.hexdigest()[:16]
+    except pex.PexError as err:
+        log.debug("%s: compared by bytes (compile time zeroed) because %s", name, err)
+    if len(data) >= 16 and data[:4] in _PEX_MAGIC:
+        data = data[:8] + b"\0" * 8 + data[16:]   # zero the compile time
+    h.update(data)
+    return h.hexdigest()[:16]
+
+
+def _loose_pex_digest(zf: zipfile.ZipFile, info: zipfile.ZipInfo) -> str | None:
+    """A loose script's digest by meaning, or None when it is too large to read whole."""
+    if info.file_size > _PEX_MAX:
+        return None
+    return _pex_digest(hashlib.sha256(), zf.read(info), info.filename)
 
 
 def _sha16(zf: zipfile.ZipFile, info: zipfile.ZipInfo) -> str:
@@ -158,16 +183,7 @@ def _entry_digest(f, method: int, e, size: int) -> str:
         h.update(repr(e["tex"]).encode("ascii"))
     stated = sum(c[2] for c in e["chunks"])
     if e["name"].endswith(".pex") and stated <= _PEX_MAX:
-        data = b"".join(_unpacked_chunks(f, method, e["chunks"], size))
-        try:
-            h.update("\n".join(pex.listing(data)).encode("utf-8"))   # by meaning: string-table order ignored
-            return h.hexdigest()[:16]
-        except pex.PexError as err:
-            log.debug("%s: compared by bytes (compile time zeroed) because %s", e["name"], err)
-        if len(data) >= 16 and data[:4] in _PEX_MAGIC:
-            data = data[:8] + b"\0" * 8 + data[16:]   # zero the compile time
-        h.update(data)
-        return h.hexdigest()[:16]
+        return _pex_digest(h, b"".join(_unpacked_chunks(f, method, e["chunks"], size)), e["name"])
     for data in _unpacked_chunks(f, method, e["chunks"], size):
         h.update(data)
     return h.hexdigest()[:16]
@@ -240,7 +256,8 @@ def _compare(tested: str, built: str, pins: dict) -> dict:
     problems, warnings, entries = [], [], []
     with _open_zip(tested, "tested") as za, _open_zip(built, "built") as zb:
         a, b = zip_entries(za), zip_entries(zb)
-        if not a and not b:
+        every_file = not _has_plugin(a) and not _has_plugin(b)
+        if every_file:
             log.debug("no plugin files in either zip: comparing every file")
             a, b = zip_entries(za, True), zip_entries(zb, True)
             if not a and not b:
@@ -269,7 +286,12 @@ def _compare(tested: str, built: str, pins: dict) -> dict:
                 add(name, "same")
                 continue
             detail = f"the tested zip's copy has sha256 {sa}, and the built zip's copy has {sb}"
-            if key.endswith(".ba2"):
+            if key.endswith(".pex"):
+                pa, pb = _loose_pex_digest(za, ia), _loose_pex_digest(zb, ib)
+                if pa is not None and pa == pb:
+                    add(name, "same", "the script does the same (compared by meaning)")
+                    continue
+            elif key.endswith(".ba2"):
                 try:
                     da, db = _ba2_digests_in_zip(za, ia), _ba2_digests_in_zip(zb, ib)
                 except BA2Unreadable as e:
@@ -291,7 +313,12 @@ def _compare(tested: str, built: str, pins: dict) -> dict:
             problems.append(f"{name} differs: {detail}.")
     n_diff = sum(1 for e in entries if e["status"] in ("differs", "only in tested", "only in built"))
     return {"format": COMPARE_FORMAT, "same": not problems, "problems": problems, "warnings": warnings,
-            "entries": entries, "differ": n_diff, "total": len(entries)}
+            "entries": entries, "differ": n_diff, "total": len(entries), "every_file": every_file}
+
+
+def ok_line(result: dict) -> str:
+    what = "files" if result.get("every_file") else "plugins and scripts"
+    return f"OK: the built zip has the same {what} as the tested zip."
 
 
 def print_report(result: dict) -> None:
@@ -301,11 +328,11 @@ def print_report(result: dict) -> None:
     for w in result["warnings"]:
         print(f"WARNING: {w}")
     if result["same"]:
-        print("OK: the built zip has the same plugins as the tested zip.")
+        print(ok_line(result))
     elif not result["entries"]:
         print(f"DIFFERENT: {result['problems'][0]}")
     else:
-        print(f"DIFFERENT: {result['differ']} of {result['total']} plugin files differ.")
+        print(f"DIFFERENT: {result['differ']} of {result['total']} files differ.")
 
 
 def as_json(result: dict) -> str:

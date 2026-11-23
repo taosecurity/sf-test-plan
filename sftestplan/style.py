@@ -5,6 +5,7 @@ Every rule is optional. Style problems join the plan's other problems with codes
 style-sentence and style-banned, at the file's `level` (default error)."""
 from __future__ import annotations
 
+import datetime
 import json
 import logging
 import re
@@ -148,9 +149,10 @@ def _iso(kind: str, m: re.Match) -> str:
             d, mo, y = int(m.group(1)), _month(m.group(2)), int(m.group(3))
     except ValueError:
         return ""
-    if not (1 <= mo <= 12 and 1 <= d <= 31):
+    try:
+        return datetime.date(y, mo, d).isoformat()
+    except ValueError:   # no such date (Feb 31): the message falls back to "Write it as YYYY-MM-DD."
         return ""
-    return f"{y:04d}-{mo:02d}-{d:02d}"
 
 
 def _month(name: str) -> int:
