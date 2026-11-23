@@ -86,8 +86,9 @@ class Round11(unittest.TestCase):
         self.assertEqual(code, 2, out + err)
         self.assertIn("such as " + self.second(marks) + ".", err)
 
-    # Finding 3: a Windows reparse point that isn't a symbolic link is never the hint.
-    def test_free_name_skips_a_reparse_point(self):
+    # Finding 3 (changed in round 12): a Windows reparse point that isn't a symbolic link, such as a OneDrive file,
+    # is an ordinary file that build and logs write in place, so the hint keeps it, as the output checks do.
+    def test_free_name_keeps_a_reparse_point_that_is_not_a_link(self):
         default = os.path.join(self.d, "q.html")
         self.write(default, "x")
         real_lstat = cli._lstat
@@ -98,7 +99,7 @@ class Round11(unittest.TestCase):
                                    st_file_attributes=0x400)
 
         with mock.patch.object(cli, "_lstat", reparse):
-            self.assertEqual(cli._free_name(default, [self.plan]), self.second(default))
+            self.assertEqual(cli._free_name(default, [self.plan]), default)
 
     # Finding 4: a read-only file at the default name is never the hint (following it would only fail).
     def test_build_hint_skips_a_read_only_file(self):
@@ -120,8 +121,8 @@ class Round11(unittest.TestCase):
 
     # Finding 2: build --out and logs --out refuse a symbolic link, as rules does.
     def _as_link(self, target):
-        real_islink = os.path.islink
-        return mock.patch("sftestplan.cli.os.path.islink", side_effect=lambda p: p == target or real_islink(p))
+        real_is_link = cli._is_link
+        return mock.patch.object(cli, "_is_link", side_effect=lambda p: p == target or real_is_link(p))
 
     def test_build_refuses_a_link_as_the_output(self):
         page = os.path.join(self.d, "page.html")
@@ -155,13 +156,28 @@ class Round11(unittest.TestCase):
         self.assertIn("is a symbolic link", err)
         self.assertEqual(self.read(other), "keep")
 
+    def test_logs_refuses_a_real_symlink_as_the_output(self):
+        other = os.path.join(self.d, "notes.json")
+        self.write(other, "keep")
+        marks = os.path.join(self.d, "m.json")
+        try:
+            os.symlink(other, marks)
+        except (OSError, NotImplementedError) as e:
+            self.skipTest(f"can't make a symlink here: {e}")
+        code, out, err = run("logs", self.rep, "--plan", self.plan, "--out", marks)
+        self.assertEqual(code, 2, out + err)
+        self.assertIn(f"--out {marks} is a symbolic link.", err)
+        self.assertEqual(out, "")
+        self.assertTrue(os.path.islink(marks))
+        self.assertEqual(self.read(other), "keep")
+
     def test_docs_say_build_and_logs_refuse_links(self):
         with open(os.path.join(ROOT, "AGENTS.md"), encoding="utf-8") as f:
             agents = f.read()
         for cmd in ("build", "logs"):
             row = next(line for line in agents.splitlines() if line.startswith(f"| `{cmd}` |"))
             self.assertIn("refuses a symbolic link as the output", row, cmd)
-        wanted = {"README.md": "an output that is a symbolic link is refused",
+        wanted = {"README.md": "`build` and `logs` also refuse an output that is a symbolic link",
                   "CHANGELOG.md": "`build --out` and `logs --out` now refuse an output file that is a symbolic link"}
         for name, phrase in wanted.items():
             with open(os.path.join(ROOT, name), encoding="utf-8") as f:

@@ -77,8 +77,7 @@ def cmd_build(args) -> int:
         raise SetupError(f"{given} is the plan itself. Give the page another name with --out, such as {hint}.")
     if _same_file(out, protected[1]):
         raise SetupError(f"{given} is the plan's results file. Give the page another name with --out, such as {hint}.")
-    if os.path.islink(out):    # writing would replace the link's target, a file the user didn't name
-        raise SetupError(f"{given} is a symbolic link. Give the real file, or another name, with --out, such as {hint}.")
+    _refuse_linked_output(out, given, hint)
     if os.path.isdir(out):
         raise SetupError(f"{out} is a folder, not a page file. Give a file name with --out, such as {out}{os.sep}page.html.")
     html = render.render(plan, rows)
@@ -126,8 +125,7 @@ def cmd_logs(args) -> int:
     for other, what in guarded:
         if _same_file(out, other):
             raise SetupError(f"{given} is {what} itself. Give the marks file another name with --out, such as {hint}.")
-    if os.path.islink(out):    # writing would replace the link's target, a file the user didn't name
-        raise SetupError(f"{given} is a symbolic link. Give the real file, or another name, with --out, such as {hint}.")
+    _refuse_linked_output(out, given, hint)
     if os.path.isdir(out):     # before any output, so a refused run prints only its error
         raise SetupError(f"{out} is a folder, not a marks file. Give a file name with --out, such as {out}{os.sep}marks.json.")
     marks, lines = results.logs_to_marks(plan, report, args.mod, _now())
@@ -203,18 +201,37 @@ def _lstat(name: str) -> os.stat_result:
     return os.lstat(name)
 
 
+def _is_link(name: str) -> bool:
+    """os.path.islink, in one place so the tests can stand in for it."""
+    return os.path.islink(name)
+
+
+def _refuse_linked_output(out: str, given: str, hint: str) -> None:
+    """build and logs: refuse an output that is a symbolic link (writing would replace the file it points to) or an
+    existing file with another hard link (writing would change that other file too). Other Windows reparse points,
+    such as OneDrive files, are ordinary files that Windows writes in place, so they aren't refused (0.3.2). On a
+    drive that gives every file the id 0 a hard link can't be seen, so it isn't refused there."""
+    if _is_link(out):
+        raise SetupError(f"{given} is a symbolic link. Give the real file, or another name, with --out, such as {hint}.")
+    try:
+        st = _lstat(out)
+    except (OSError, ValueError):
+        return
+    if stat.S_ISREG(st.st_mode) and st.st_ino != 0 and st.st_nlink > 1:
+        raise SetupError(f"{given} has another hard link, so writing it would change that other file too. "
+                         f"Give another name with --out, such as {hint}.")
+
+
 def _plain_file(name: str) -> bool:
-    """True when an existing name may be suggested for build or logs to overwrite: a regular file (not a folder, a
-    link or another Windows reparse point), with a file id that isn't 0 (on a drive that gives every file the id
-    0 a hard link can't be seen), no other hard link (overwriting it would change another file too), and
-    writable (else following the hint would only fail)."""
+    """True when an existing name may be suggested for build or logs to overwrite: a regular file (not a folder or
+    a symbolic link), with a file id that isn't 0 (on a drive that gives every file the id 0 a hard link can't be
+    seen), no other hard link (build and logs refuse those), and not read-only (else following the hint would
+    only fail). os.access checks only the read-only flag on Windows, not the file's permission lists."""
     try:
         st = _lstat(name)
     except (OSError, ValueError):
         return False
     if not stat.S_ISREG(st.st_mode) or st.st_ino == 0 or st.st_nlink != 1:
-        return False
-    if getattr(st, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400):
         return False
     return os.access(name, os.W_OK)
 
@@ -350,8 +367,8 @@ def cmd_rules(args) -> int:
     # The output file itself is never a link: replacing a link's target (or the link) is a surprise either way.
     # Checked only when something will be written, so a linked --from file with nothing to add still exits 0.
     # Both refusals come before any output, so a refused run prints only its error (0.3.1).
-    if os.path.islink(out):
-        raise SetupError(f"{out} is a link; give the real file with --out.")
+    if _is_link(out):
+        raise SetupError(f"{given} is a symbolic link. {fix}, such as {hint}, or give the real file with --out.")
     if os.path.lexists(out) and not args.force:
         if base is not None and _same_file(out, args.from_file):
             hint = "add --force to add the new rules to it" if added else "add --force to update its prefix"

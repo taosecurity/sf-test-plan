@@ -517,7 +517,7 @@ class SimplifyRoundTests(unittest.TestCase):
         with mock.patch("sftestplan.cli.os.path.islink", side_effect=lambda p: p == target or real_islink(p)):
             code, out, err = run("rules", self.plan, "--from", target, "--force")
         self.assertEqual(code, 2)
-        self.assertIn(f"{target} is a link; give the real file with --out.", err)
+        self.assertIn(f"--from {target} is a symbolic link. Without --out, the rule file is written back to the --from file, so give the rule file another name with --out, such as ", err)
         with open(target, encoding="utf-8") as f:
             self.assertEqual(f.read(), before)
 
@@ -537,7 +537,7 @@ class SimplifyRoundTests(unittest.TestCase):
             code, out, err = run("rules", self.plan, "--from", target)
         self.assertEqual(code, 0, err)
         self.assertIn("Nothing to add, so nothing was written.", out)
-        self.assertNotIn("is a link", err)
+        self.assertNotIn("symbolic link", err)
         self.assertEqual(self._snapshot(target), before)
 
     def test_a_real_symlinked_from_file_with_nothing_to_add_is_left_alone(self):
@@ -566,7 +566,7 @@ class SimplifyRoundTests(unittest.TestCase):
             self.skipTest(f"can't make a symlink here: {e}")
         code, _, err = run("rules", self.plan, "--from", link, "--force")
         self.assertEqual(code, 2)
-        self.assertIn("is a link", err)
+        self.assertIn("is a symbolic link", err)
         self.assertTrue(os.path.islink(link))
         self.assertEqual(self._load(real)["expect"][-1]["id"], "placed")
 
@@ -578,7 +578,7 @@ class SimplifyRoundTests(unittest.TestCase):
             self.skipTest(f"can't make a symlink here: {e}")
         code, _, err = run("rules", self.plan, "--out", link, "--force")
         self.assertEqual(code, 2)
-        self.assertIn("is a link", err)
+        self.assertIn("is a symbolic link", err)
         self.assertFalse(os.path.exists(os.path.join(self.d, "gone.json")))
 
     def test_existing_check_counts_a_dangling_link(self):
@@ -596,7 +596,7 @@ class SimplifyRoundTests(unittest.TestCase):
             code, out, err = run("rules", self.plan, "--from", target, "--force")
         self.assertEqual(code, 2)
         self.assertEqual(out, "")
-        self.assertIn(f"{target} is a link; give the real file with --out.", err)
+        self.assertIn(f"--from {target} is a symbolic link. Without --out, the rule file is written back to the --from file, so give the rule file another name with --out, such as ", err)
 
     def test_a_refused_real_symlink_run_prints_nothing_on_stdout(self):
         real = self._rules()
@@ -608,7 +608,7 @@ class SimplifyRoundTests(unittest.TestCase):
         code, out, err = run("rules", self.plan, "--from", link, "--force")
         self.assertEqual(code, 2)
         self.assertEqual(out, "")
-        self.assertIn("is a link", err)
+        self.assertIn("is a symbolic link", err)
 
     def test_a_refused_existing_file_run_prints_nothing_on_stdout(self):
         target = self._rules()
