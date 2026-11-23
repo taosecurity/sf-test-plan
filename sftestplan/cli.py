@@ -195,15 +195,15 @@ def _same_file(a: str, b: str) -> bool:
 
 
 def _free_name(default: str, protected) -> str:
-    """A name for a refusal hint: default when it isn't one of the protected files, else default with "-2",
-    "-3" ... before its ending, the first that is neither a protected file nor already on disk."""
+    """A name for a refusal hint: default, else default with "-2", "-3" ... before its ending, the first that is
+    neither a protected file nor already on disk (so following the hint never runs into "already exists")."""
     def free(name):
-        return not any(_same_file(name, p) for p in protected)
+        return not os.path.lexists(name) and not any(_same_file(name, p) for p in protected)
     if free(default):
         return default
     stem, ext = os.path.splitext(default)
     n = 2
-    while not free(f"{stem}-{n}{ext}") or os.path.lexists(f"{stem}-{n}{ext}"):
+    while not free(f"{stem}-{n}{ext}"):
         n += 1
     return f"{stem}-{n}{ext}"
 
@@ -274,15 +274,16 @@ def cmd_rules(args) -> int:
     hint = _free_name(_default_rules_out(args.plan), protected)
     # Without --out the rule file is the --from file, so a refusal names the option the path came from.
     if args.out:
-        given = f"--out {out}"
+        given, fix = f"--out {out}", "Give the rule file another name with --out"
     elif args.from_file:
-        given = f"--from {out} (without --out, the rule file is written back to the --from file)"
+        given = f"--from {out}"
+        fix = "Without --out, the rule file is written back to the --from file, so give it another name with --out"
     else:
-        given = f"The default rule file {out}"
+        given, fix = f"The default rule file {out}", "Give the rule file another name with --out"
     if _same_file(out, args.plan):
-        raise SetupError(f"{given} is the plan itself. Give the rule file another name with --out, such as {hint}.")
+        raise SetupError(f"{given} is the plan itself. {fix}, such as {hint}.")
     if _same_file(out, protected[1]):
-        raise SetupError(f"{given} is the plan's results file. Give the rule file another name with --out, such as {hint}.")
+        raise SetupError(f"{given} is the plan's results file. {fix}, such as {hint}.")
     if os.path.isdir(out):
         raise SetupError(f"{out} is a folder, not a rule file. Give a file name with --out, such as "
                          f"{out}{os.sep}rules.json.")
