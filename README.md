@@ -301,7 +301,7 @@ Group 2: Beacon Mod (1 check)
 Shared plan: NewGamePlus.testplan.md (1 mod). Then run: sf-test-plan build NewGamePlus.testplan.md
 ```
 
-The order file is a JSON list of mod names. It fixes each mod's group number, so marks never move when a mod is added; new mods are added at the end. Build the shared plan as usual.
+The order file is a JSON list of mod names. A mod's group number is the base plan's highest group number plus the mod's place in the list, so marks never move when a mod is added; new mods are added at the end. A new base group with a number above the base's highest moves every mod's group, and the testers' saved marks for those groups then show on the wrong checks. To add shared checks later, add them at the end of an existing base group instead. Build the shared plan as usual.
 
 ### Style rules
 

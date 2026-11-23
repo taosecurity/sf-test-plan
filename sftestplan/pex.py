@@ -6,7 +6,8 @@ are the same. listing() swaps every table number for the text it stands for and 
 variables, properties, states, functions, instructions and debug info as lines. Two scripts are the same when
 their listings match.
 
-Never compared: the compile time, the source-file modification time and the string-table order. Sections whose
+Never compared: the compile time, the source-file modification time, the source path, user and machine names in
+the header, and the string-table order. Sections whose
 order means nothing (user flags, struct members, variables, guards, properties, states' functions, locals, debug
 entries) are sorted, and temporary variables (::tempN) are renamed by first use, because the compiler writes them
 in a build-dependent order. Instruction order inside a function is compared as written, and so is a struct's
@@ -151,7 +152,8 @@ def listing(data: bytes) -> list[str]:
         raise PexError(f"PEX version {major}.{minor} isn't supported")
     with_guards = (major, minor) >= (3, 12)
     r.u64()  # compile time: never compared
-    out = [f"pex {major}.{minor} game {game}", f"source {r.wstr()}  user {r.wstr()}  machine {r.wstr()}"]
+    r.wstr(), r.wstr(), r.wstr()  # source path, user and machine: they name the build PC, so never compared
+    out = [f"pex {major}.{minor} game {game}"]
     r.strings = [r.wstr() for _ in range(r.u16())]
 
     debug = []

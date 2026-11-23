@@ -27,7 +27,8 @@ class PexWriter:
     def __init__(self, order=None):
         self.order = order
 
-    def build(self, stamp=1, code=(("assign", "::temp0", 5), ("return", "::temp0")), greeting="Hello"):
+    def build(self, stamp=1, code=(("assign", "::temp0", 5), ("return", "::temp0")), greeting="Hello",
+              where=("BeaconScript.psc", "builder", "PC1")):
         strings = ["BeaconScript", "ScriptObject", "", "OnInit", "None", "::temp0", "Int", "Greeting", "String",
                    greeting]
         if self.order:
@@ -60,7 +61,7 @@ class PexWriter:
                 + struct.pack("<H", 1) + s("") + struct.pack("<H", 1) + s("OnInit") + fn)
         obj = s("BeaconScript") + struct.pack("<I", len(body) + 4) + body
         head = (struct.pack("<I", 0xFA57C0DE) + bytes([3, 12]) + struct.pack("<H", 4) + struct.pack("<Q", stamp)
-                + wstr("BeaconScript.psc") + wstr("builder") + wstr("PC1"))
+                + b"".join(wstr(x) for x in where))
         table = struct.pack("<H", len(strings)) + b"".join(wstr(x) for x in strings)
         return head + table + b"\x00" + struct.pack("<H", 0) + struct.pack("<H", 1) + obj
 
@@ -73,6 +74,12 @@ class PexListingTests(unittest.TestCase):
         a = PexWriter().build(stamp=1)
         b = PexWriter(REORDER).build(stamp=99)
         self.assertNotEqual(a, b)
+        self.assertEqual(pex.listing(a), pex.listing(b))
+
+    def test_other_build_pc_matches(self):
+        # Code review round 2 (0.4.0): the same source built in another folder, by another user on another PC.
+        a = PexWriter().build()
+        b = PexWriter(REORDER).build(where=(r"D:\Other\Scripts\BeaconScript.psc", "someone", "LAPTOP"))
         self.assertEqual(pex.listing(a), pex.listing(b))
 
     def test_changed_code_differs(self):
