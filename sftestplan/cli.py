@@ -70,9 +70,9 @@ def cmd_build(args) -> int:
         return code
     rows = results.load_results(args.plan)
     out = args.out or _default_out(args.plan)
-    html = render.render(plan, rows)
     if os.path.isdir(out):
         raise SetupError(f"{out} is a folder, not a page file. Give a file name with --out, such as {out}{os.sep}page.html.")
+    html = render.render(plan, rows)
     try:
         with open(out, "w", encoding="utf-8", newline="\n") as f:
             f.write(html)
@@ -109,12 +109,12 @@ def cmd_logs(args) -> int:
     if plan.errors():
         return _report(plan)
     report = results._load_json(args.report, "Give the .json report papyrus-log-check wrote.")
+    out = args.out or os.path.splitext(args.report)[0] + ".marks.json"
+    if os.path.isdir(out):     # before any output, so a refused run prints only its error
+        raise SetupError(f"{out} is a folder, not a marks file. Give a file name with --out, such as {out}{os.sep}marks.json.")
     marks, lines = results.logs_to_marks(plan, report, args.mod, _now())
     for line in lines:
         print(line)
-    out = args.out or os.path.splitext(args.report)[0] + ".marks.json"
-    if os.path.isdir(out):
-        raise SetupError(f"{out} is a folder, not a marks file. Give a file name with --out, such as {out}{os.sep}marks.json.")
     try:
         with open(out, "w", encoding="utf-8", newline="\n") as f:
             json.dump(marks, f, indent=1)
@@ -232,6 +232,9 @@ def cmd_rules(args) -> int:
     if _same_file(out, args.plan):
         raise SetupError(f"--out {out} is the plan itself. Give the rule file another name, such as "
                          f"{_default_rules_out(args.plan)}.")
+    if os.path.isdir(out):
+        raise SetupError(f"{out} is a folder, not a rule file. Give a file name with --out, such as "
+                         f"{out}{os.sep}rules.json.")
     base = None
     if args.from_file:
         base = results._load_json(args.from_file, "Give the papyrus-log-check rule file (.json).")
@@ -296,6 +299,9 @@ def cmd_rules(args) -> int:
 
 
 def cmd_new(args) -> int:
+    if os.path.isdir(args.plan):
+        raise SetupError(f"{args.plan} is a folder, not a plan file. Give a file name, such as "
+                         f"{args.plan}{os.sep}MyMod.testplan.md.")
     if os.path.exists(args.plan) and not args.force:
         raise SetupError(f"{args.plan} already exists. Pick another name, or add --force to replace it.")
     mod = args.mod or _mod_from_path(args.plan)

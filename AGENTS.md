@@ -105,7 +105,9 @@ Run `check` after every edit and fix what it reports before building.
 | `new` | nothing | the starter plan (refuses to replace a file without `--force`) |
 
 `<plan>.results.json` means the plan's name without `.md`, plus `.results.json`
-(`MyMod.testplan.md` gives `MyMod.testplan.results.json`).
+(`MyMod.testplan.md` gives `MyMod.testplan.results.json`). The page, rule file and results file names drop only
+`.md` (the rule file drops `.testplan.md`), so a plan named `Cool.Mod.txt` gives the mod name "Cool.Mod" but the
+files `Cool.Mod.txt.html`, `Cool.Mod.txt.logrules.json` and `Cool.Mod.txt.results.json`.
 
 Exit codes: 0 done (warnings allowed); 1 the plan has errors (printed as `file:line: error code: message`); 2 bad
 input or setup (a file can't be read or written, a folder given where a file belongs, bad JSON, a marks file in another format, a wrong option).

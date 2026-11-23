@@ -22,7 +22,7 @@ The rule file's `mod` is "My.Mod".
 - `new` and `rules` now keep the dots in a plan's file name when they take the mod name from it. Before, `My.Mod.testplan.md` gave the mod name "My". Now it gives "My.Mod", and only the `.testplan.md` or `.md` ending is removed, the same ending the default rule file name drops. Any other ending loses only its last extension (`plan.txt` gives "plan").
 - A folder given where a file belongs (the plan, the marks file, the report, the rule file, or `--out`) now gets "is a folder, not a file" with the fix. On Windows it used to say "Permission denied".
 - `new` in a folder that doesn't exist now says to check that the folder exists and can be written to.
-- `--log` now records the file name and the mod name taken from it on every run.
+- `--log` now records the file name and the mod name taken from it, on `new` and `rules` runs that take the name from the file.
 - The tests now use made-up mod names as samples, so the release holds no names of private projects.
 
 ## 0.3.1 (2026-11-22)
