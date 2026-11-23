@@ -70,12 +70,12 @@ def cmd_build(args) -> int:
         return code
     rows = results.load_results(args.plan)
     out = args.out or _default_out(args.plan)
+    protected = (args.plan, results.results_path(args.plan))
+    hint = _free_name(_default_out(args.plan), protected)
     if _same_file(out, args.plan):
-        raise SetupError(f"--out {out} is the plan itself. Give the page another name, such as "
-                         f"{_default_out(args.plan)}.")
-    if _same_file(out, results.results_path(args.plan)):
-        raise SetupError(f"--out {out} is the plan's results file. Give the page another name, such as "
-                         f"{_default_out(args.plan)}.")
+        raise SetupError(f"--out {out} is the plan itself. Give the page another name, such as {hint}.")
+    if _same_file(out, protected[1]):
+        raise SetupError(f"--out {out} is the plan's results file. Give the page another name, such as {hint}.")
     if os.path.isdir(out):
         raise SetupError(f"{out} is a folder, not a page file. Give a file name with --out, such as {out}{os.sep}page.html.")
     html = render.render(plan, rows)
@@ -116,11 +116,12 @@ def cmd_logs(args) -> int:
         return _report(plan)
     report = results._load_json(args.report, "Give the .json report papyrus-log-check wrote.")
     out = args.out or os.path.splitext(args.report)[0] + ".marks.json"
-    for other, what in ((args.plan, "the plan"), (args.report, "the report"),
-                        (results.results_path(args.plan), "the plan's results file")):
+    guarded = ((args.plan, "the plan"), (args.report, "the report"),
+               (results.results_path(args.plan), "the plan's results file"))
+    hint = _free_name(os.path.splitext(args.report)[0] + ".marks.json", [p for p, _ in guarded])
+    for other, what in guarded:
         if _same_file(out, other):
-            raise SetupError(f"--out {out} is {what} itself. Give the marks file another name, such as "
-                             f"{os.path.splitext(args.report)[0] + '.marks.json'}.")
+            raise SetupError(f"--out {out} is {what} itself. Give the marks file another name, such as {hint}.")
     if os.path.isdir(out):     # before any output, so a refused run prints only its error
         raise SetupError(f"{out} is a folder, not a marks file. Give a file name with --out, such as {out}{os.sep}marks.json.")
     marks, lines = results.logs_to_marks(plan, report, args.mod, _now())
@@ -177,7 +178,21 @@ def _count(n: int, word: str) -> str:
 
 
 def _same_file(a: str, b: str) -> bool:
-    return os.path.normcase(os.path.realpath(a)) == os.path.normcase(os.path.realpath(b))
+    """True when a and b are the same file: same real path, or (both exist) a hard link to one file."""
+    if os.path.normcase(os.path.realpath(a)) == os.path.normcase(os.path.realpath(b)):
+        return True
+    try:
+        return os.path.samefile(a, b)
+    except OSError:
+        return False
+
+
+def _free_name(default: str, protected) -> str:
+    """default, or default with "-2" before its ending when it is one of the protected files (for a hint)."""
+    if not any(_same_file(default, p) for p in protected):
+        return default
+    stem, ext = os.path.splitext(default)
+    return f"{stem}-2{ext}"
 
 
 def _ascii(s: str) -> str:
@@ -242,9 +257,12 @@ def cmd_rules(args) -> int:
         raise SetupError(f"--from {args.from_file} is a folder, not a rule file. Give the papyrus-log-check rule "
                          f"file (.json).")
     out = args.out or (args.from_file if args.from_file else _default_rules_out(args.plan))
+    protected = (args.plan, results.results_path(args.plan))
+    hint = _free_name(_default_rules_out(args.plan), protected)
     if _same_file(out, args.plan):
-        raise SetupError(f"--out {out} is the plan itself. Give the rule file another name, such as "
-                         f"{_default_rules_out(args.plan)}.")
+        raise SetupError(f"--out {out} is the plan itself. Give the rule file another name, such as {hint}.")
+    if _same_file(out, protected[1]):
+        raise SetupError(f"--out {out} is the plan's results file. Give the rule file another name, such as {hint}.")
     if os.path.isdir(out):
         raise SetupError(f"{out} is a folder, not a rule file. Give a file name with --out, such as "
                          f"{out}{os.sep}rules.json.")
