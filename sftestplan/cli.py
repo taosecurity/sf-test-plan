@@ -73,6 +73,9 @@ def cmd_build(args) -> int:
     if _same_file(out, args.plan):
         raise SetupError(f"--out {out} is the plan itself. Give the page another name, such as "
                          f"{_default_out(args.plan)}.")
+    if _same_file(out, results.results_path(args.plan)):
+        raise SetupError(f"--out {out} is the plan's results file. Give the page another name, such as "
+                         f"{_default_out(args.plan)}.")
     if os.path.isdir(out):
         raise SetupError(f"{out} is a folder, not a page file. Give a file name with --out, such as {out}{os.sep}page.html.")
     html = render.render(plan, rows)
@@ -113,7 +116,8 @@ def cmd_logs(args) -> int:
         return _report(plan)
     report = results._load_json(args.report, "Give the .json report papyrus-log-check wrote.")
     out = args.out or os.path.splitext(args.report)[0] + ".marks.json"
-    for other, what in ((args.plan, "the plan"), (args.report, "the report")):
+    for other, what in ((args.plan, "the plan"), (args.report, "the report"),
+                        (results.results_path(args.plan), "the plan's results file")):
         if _same_file(out, other):
             raise SetupError(f"--out {out} is {what} itself. Give the marks file another name, such as "
                              f"{os.path.splitext(args.report)[0] + '.marks.json'}.")
@@ -149,17 +153,18 @@ _TEXT_ENDINGS = ("txt", "text", "markdown", "mdown", "mkd")
 def _mod_from_path(path: str) -> str:
     """The mod name a plan's file name gives ("Beacon.testplan.md" -> "Beacon", "My.Mod.testplan.md" -> "My.Mod";
     0.3.2 keeps dots that are part of the name). A plain-text ending (.txt, .text, .markdown, .mdown, .mkd) is
-    removed too ("plan.txt" -> "plan"); any other name stays whole ("Cool.Mod" -> "Cool.Mod"). A file name that isn't valid Unicode (Linux bytes, read as lone surrogates) loses those
-    characters, since a plan or rule file is saved as UTF-8 and can't hold them (0.3.1). "My Mod" if nothing is
-    left, as in the starter plan."""
+    removed too ("plan.txt" -> "plan"); any other name stays whole ("Cool.Mod" -> "Cool.Mod"). A name that
+    starts with a dot (".hidden", ".hidden.txt") gives "My Mod". A file name that isn't valid Unicode (Linux
+    bytes, read as lone surrogates) loses those characters, since a plan or rule file is saved as UTF-8 and
+    can't hold them (0.3.1). "My Mod" if nothing is left, as in the starter plan."""
     base = os.path.basename(path)
     name = _strip_plan_ending(base)
     if name == base:
         stem, dot, ext = base.rpartition(".")
         if dot and stem and ext.lower() in _TEXT_ENDINGS:
             name = stem
-        elif base.startswith("."):
-            name = ""
+    if name.startswith("."):
+        name = ""
     kept = " ".join(name.encode("utf-8", "ignore").decode("utf-8").split()) or "My Mod"
     log.debug("mod name %r from the file name %r (a plan ending, if there is one, is removed; characters that aren't valid Unicode "
               "and extra spaces are left out, and \"My Mod\" is used when nothing is left; give --mod or a mod: "

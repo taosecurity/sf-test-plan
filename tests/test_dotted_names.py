@@ -33,7 +33,7 @@ class DottedNames(unittest.TestCase):
             "My.Mod.TESTPLAN.MD": "My.Mod",
             "My.Mod.md": "My.Mod",
             "v1.2.testplan.md": "v1.2",
-            "plan.txt": "plan",          # another ending: only the last extension goes
+            "plan.txt": "plan",          # a plain-text ending goes
             "My.Mod.txt": "My.Mod",
             "plain": "plain",
             ".testplan.md": "My Mod",
