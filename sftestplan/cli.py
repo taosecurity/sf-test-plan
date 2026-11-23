@@ -70,16 +70,15 @@ def cmd_build(args) -> int:
         return code
     rows = results.load_results(args.plan)
     out = args.out or _default_out(args.plan)
-    protected = (args.plan, results.results_path(args.plan))
-    hint = _free_name(_default_out(args.plan), protected)
     given = f"--out {out}" if args.out else f"The default page {out}"
+    fix = "Give the page another name with --out"
     if _same_file(out, args.plan):
-        raise SetupError(f"{given} is the plan itself. Give the page another name with --out, such as {hint}.")
-    if _same_file(out, protected[1]):
-        raise SetupError(f"{given} is the plan's results file. Give the page another name with --out, such as {hint}.")
-    _refuse_linked_output(out, given, hint)
+        raise SetupError(f"{given} is the plan itself. {fix}.")
+    if _same_file(out, results.results_path(args.plan)):
+        raise SetupError(f"{given} is the plan's results file. {fix}.")
     if os.path.isdir(out):
         raise SetupError(f"{out} is a folder, not a page file. Give a file name with --out, such as {out}{os.sep}page.html.")
+    _refuse_unsafe_output(out, given, fix)
     html = render.render(plan, rows)
     try:
         with open(out, "w", encoding="utf-8", newline="\n") as f:
@@ -120,14 +119,15 @@ def cmd_logs(args) -> int:
     out = args.out or os.path.splitext(args.report)[0] + ".marks.json"
     guarded = ((args.plan, "the plan"), (args.report, "the report"),
                (results.results_path(args.plan), "the plan's results file"))
-    hint = _free_name(os.path.splitext(args.report)[0] + ".marks.json", [p for p, _ in guarded])
     given = f"--out {out}" if args.out else f"The default marks file {out}"
+    fix = "Give the marks file another name with --out"
     for other, what in guarded:
         if _same_file(out, other):
-            raise SetupError(f"{given} is {what} itself. Give the marks file another name with --out, such as {hint}.")
-    _refuse_linked_output(out, given, hint)
-    if os.path.isdir(out):     # before any output, so a refused run prints only its error
+            raise SetupError(f"{given} is {what} itself. {fix}.")
+    # All refusals come before any output, so a refused run prints only its error.
+    if os.path.isdir(out):
         raise SetupError(f"{out} is a folder, not a marks file. Give a file name with --out, such as {out}{os.sep}marks.json.")
+    _refuse_unsafe_output(out, given, fix)
     marks, lines = results.logs_to_marks(plan, report, args.mod, _now())
     for line in lines:
         print(line)
@@ -182,23 +182,7 @@ def _count(n: int, word: str) -> str:
 
 
 def _same_file(a: str, b: str) -> bool:
-    """True when a and b are the same file: same real path, or (both exist) a hard link to one file.
-
-    The hard-link test trusts file ids only when they are non-zero: some drives (certain network shares,
-    RAM disks, \\\\wsl$ mounts) give every file the id 0, and os.path.samefile would call them all one file.
-    """
-    if os.path.normcase(os.path.realpath(a)) == os.path.normcase(os.path.realpath(b)):
-        return True
-    try:
-        sa, sb = os.stat(a), os.stat(b)
-    except (OSError, ValueError):
-        return False
-    return sa.st_ino != 0 and (sa.st_ino, sa.st_dev) == (sb.st_ino, sb.st_dev)
-
-
-def _lstat(name: str) -> os.stat_result:
-    """os.lstat, in one place so the tests can stand in for it."""
-    return os.lstat(name)
+    return os.path.normcase(os.path.realpath(a)) == os.path.normcase(os.path.realpath(b))
 
 
 def _is_link(name: str) -> bool:
@@ -206,53 +190,21 @@ def _is_link(name: str) -> bool:
     return os.path.islink(name)
 
 
-def _refuse_linked_output(out: str, given: str, hint: str) -> None:
-    """build and logs: refuse an output that is a symbolic link (writing would replace the file it points to) or an
-    existing file with another hard link (writing would change that other file too). Other Windows reparse points,
-    such as OneDrive files, are ordinary files that Windows writes in place, so they aren't refused (0.3.2). On a
-    drive that gives every file the id 0 a hard link can't be seen, so it isn't refused there."""
+def _refuse_unsafe_output(out: str, given: str, fix: str) -> None:
+    """Refuse an output this command must not write: a symbolic link (writing would change the file it points to,
+    or replace the link), or an existing name that isn't a regular file or is read-only. A missing name, or an
+    existing regular file that isn't read-only (OneDrive files included), is fine. Folders get their own message
+    before this is called. Nothing is printed before the error, so a refused run shows only that."""
     if _is_link(out):
-        raise SetupError(f"{given} is a symbolic link. Give the real file, or another name, with --out, such as {hint}.")
-    try:
-        st = _lstat(out)
-    except (OSError, ValueError):
+        raise SetupError(f"{given} is a symbolic link, so nothing was written. {fix}, or give the real file "
+                         f"with --out.")
+    if not os.path.lexists(out):
         return
-    if stat.S_ISREG(st.st_mode) and st.st_ino != 0 and st.st_nlink > 1:
-        raise SetupError(f"{given} has another hard link, so writing it would change that other file too. "
-                         f"Give another name with --out, such as {hint}.")
-
-
-def _plain_file(name: str) -> bool:
-    """True when an existing name may be suggested for build or logs to overwrite: a regular file (not a folder or
-    a symbolic link), with a file id that isn't 0 (on a drive that gives every file the id 0 a hard link can't be
-    seen), no other hard link (build and logs refuse those), and not read-only (else following the hint would
-    only fail). os.access checks only the read-only flag on Windows, not the file's permission lists."""
-    try:
-        st = _lstat(name)
-    except (OSError, ValueError):
-        return False
-    if not stat.S_ISREG(st.st_mode) or st.st_ino == 0 or st.st_nlink != 1:
-        return False
-    return os.access(name, os.W_OK)
-
-
-def _free_name(default: str, protected, skip_existing: bool = False) -> str:
-    """A name for a refusal hint: default, else default with "-2", "-3" ... before its ending, the first that is
-    not a protected file. With skip_existing (rules, which refuses an existing output without --force) it must
-    not be on disk either, so following the hint never runs into "already exists". build and logs overwrite
-    their output, so their hint keeps the usual default name when it is on disk but not protected, as long as
-    _plain_file says following the hint is safe to overwrite and will work."""
-    def free(name):
-        if os.path.lexists(name) and (skip_existing or not _plain_file(name)):
-            return False
-        return not any(_same_file(name, p) for p in protected)
-    if free(default):
-        return default
-    stem, ext = os.path.splitext(default)
-    n = 2
-    while not free(f"{stem}-{n}{ext}"):
-        n += 1
-    return f"{stem}-{n}{ext}"
+    if not os.path.isfile(out):
+        raise SetupError(f"{given} isn't a regular file, so nothing was written. {fix}.")
+    if not os.access(out, os.W_OK):
+        raise SetupError(f"{given} is read-only, so nothing was written. {fix}, or clear its read-only "
+                         f"setting.")
 
 
 def _ascii(s: str) -> str:
@@ -317,8 +269,6 @@ def cmd_rules(args) -> int:
         raise SetupError(f"--from {args.from_file} is a folder, not a rule file. Give the papyrus-log-check rule "
                          f"file (.json).")
     out = args.out or (args.from_file if args.from_file else _default_rules_out(args.plan))
-    protected = (args.plan, results.results_path(args.plan))
-    hint = _free_name(_default_rules_out(args.plan), protected, skip_existing=True)
     # Without --out the rule file is the --from file, so a refusal names the option the path came from.
     if args.out:
         given, fix = f"--out {out}", "Give the rule file another name with --out"
@@ -328,9 +278,9 @@ def cmd_rules(args) -> int:
     else:
         given, fix = f"The default rule file {out}", "Give the rule file another name with --out"
     if _same_file(out, args.plan):
-        raise SetupError(f"{given} is the plan itself. {fix}, such as {hint}.")
-    if _same_file(out, protected[1]):
-        raise SetupError(f"{given} is the plan's results file. {fix}, such as {hint}.")
+        raise SetupError(f"{given} is the plan itself. {fix}.")
+    if _same_file(out, results.results_path(args.plan)):
+        raise SetupError(f"{given} is the plan's results file. {fix}.")
     if os.path.isdir(out):
         raise SetupError(f"{out} is a folder, not a rule file. Give a file name with --out, such as "
                          f"{out}{os.sep}rules.json.")
@@ -364,11 +314,10 @@ def cmd_rules(args) -> int:
         print(kept_line)
         print("Nothing to add, so nothing was written.")
         return 0
-    # The output file itself is never a link: replacing a link's target (or the link) is a surprise either way.
-    # Checked only when something will be written, so a linked --from file with nothing to add still exits 0.
-    # Both refusals come before any output, so a refused run prints only its error (0.3.1).
-    if _is_link(out):
-        raise SetupError(f"{given} is a symbolic link. {fix}, such as {hint}, or give the real file with --out.")
+    # The output must be a plain file this command may write (never a link: replacing a link's target, or the
+    # link, is a surprise either way). Checked only when something will be written, so a linked --from file with
+    # nothing to add still exits 0. Both refusals come before any output, so a refused run prints only its error.
+    _refuse_unsafe_output(out, given, fix)
     if os.path.lexists(out) and not args.force:
         if base is not None and _same_file(out, args.from_file):
             hint = "add --force to add the new rules to it" if added else "add --force to update its prefix"

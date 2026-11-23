@@ -126,11 +126,7 @@ Every command also takes `--verbose` and `--log FILE`. The exit codes are:
 - **1** means the plan has errors. Each one is printed with its line number and the fix.
 - **2** means a file can't be read or written, or an option is wrong.
 
-`build`, `logs` and `rules` never write over the plan or the plan's results file, and `logs` never writes over its report. When the output (from `--out`, `--from` or the default name) is one of those files, or a hard link to one, the command stops with exit 2, writes nothing and suggests a name to give with `--out` (never a folder or a link; for `build` and `logs` either a new name or a plain file that isn't read-only and has no other hard link, and for `rules` one that doesn't exist yet).
-
-`build` and `logs` also refuse an output that is a symbolic link, and an existing output that has another hard link (writing it would change that other file too). `rules` refuses a symbolic link as its output only when it would write, so a linked `--from` file with nothing to add still exits 0. A hard-linked output is fine for `rules`, because it replaces its file instead of writing through the link. Give the real file, or another name, with `--out`.
-
-Some network shares, RAM disks and WSL folders (`\\wsl$`) give every file the id 0, so a hard link can't be detected there: on such a drive only the same path is refused, and the suggested name is one that doesn't exist yet.
+`build`, `logs` and `rules` never write over the plan or the plan's results file, and `logs` never writes over its report. They also refuse an output that is a symbolic link, a read-only file or something other than a regular file. In each case the command stops with exit 2, writes nothing, and names the file (from `--out`, `--from` or the default name) and the fix, usually to give another name with `--out`. `rules` checks for a link or a read-only file only when it would write, so a linked `--from` file with nothing to add still exits 0.
 
 ### build and check
 
@@ -201,7 +197,7 @@ The file it writes looks like this:
 - A rule for a line that must never appear belongs under `forbid`, so move it there.
 - `--prefix` sets the text your mod's log lines start with. The default is the `mod:` name's letters and digits, then a colon (`BeaconMod:`).
 - `--plugin MyMod.esm` names the mod's plugin file (repeat it for several). The default is the same name with `.esm`.
-- Without `--out`, the file is the plan's name with `.logrules.json` (`Beacon.testplan.md` gives `Beacon.logrules.json`). The command never replaces a file unless you add `--force`, and when it would write, it refuses an output file that is itself a symbolic link: give the real file with `--out`. It never writes over the plan or its results file, even with `--force` (see [Commands](#commands)).
+- Without `--out`, the file is the plan's name with `.logrules.json` (`Beacon.testplan.md` gives `Beacon.logrules.json`). The command never replaces a file unless you add `--force`, and when it would write, it refuses an output file that is a symbolic link or read-only, even with `--force`: give another name with `--out`. It never writes over the plan or its results file, even with `--force` (see [Commands](#commands)).
 
 When you add steps later, `--from` keeps the rule file you already have and adds only the ids it doesn't hold yet. Add `--force` to write the new rules into that same file.
 

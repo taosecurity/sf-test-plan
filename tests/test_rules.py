@@ -517,7 +517,7 @@ class SimplifyRoundTests(unittest.TestCase):
         with mock.patch("sftestplan.cli.os.path.islink", side_effect=lambda p: p == target or real_islink(p)):
             code, out, err = run("rules", self.plan, "--from", target, "--force")
         self.assertEqual(code, 2)
-        self.assertIn(f"--from {target} is a symbolic link. Without --out, the rule file is written back to the --from file, so give the rule file another name with --out, such as ", err)
+        self.assertIn(f"--from {target} is a symbolic link, so nothing was written. Without --out, the rule file is written back to the --from file, so give the rule file another name with --out, or give the real file with --out.", err)
         with open(target, encoding="utf-8") as f:
             self.assertEqual(f.read(), before)
 
@@ -581,12 +581,15 @@ class SimplifyRoundTests(unittest.TestCase):
         self.assertIn("is a symbolic link", err)
         self.assertFalse(os.path.exists(os.path.join(self.d, "gone.json")))
 
-    def test_existing_check_counts_a_dangling_link(self):
+    def test_a_dangling_link_is_refused_as_a_link(self):
+        # A link that points nowhere is still a link: refused before the "already exists" check (0.3.2).
         target = os.path.join(self.d, "r.json")
-        with mock.patch("sftestplan.cli.os.path.lexists", side_effect=lambda p: p == target):
-            code, _, err = run("rules", self.plan, "--out", target)
+        real_islink = os.path.islink
+        with mock.patch("sftestplan.cli.os.path.islink", side_effect=lambda p: p == target or real_islink(p)):
+            code, _, err = run("rules", self.plan, "--out", target, "--force")
         self.assertEqual(code, 2)
-        self.assertIn("already exists", err)
+        self.assertIn(f"--out {target} is a symbolic link, so nothing was written.", err)
+        self.assertFalse(os.path.lexists(target))
 
     # 0.3.1: a refused run prints only its error (nothing on stdout before the refusal)
     def test_a_refused_link_run_prints_nothing_on_stdout(self):
@@ -596,7 +599,7 @@ class SimplifyRoundTests(unittest.TestCase):
             code, out, err = run("rules", self.plan, "--from", target, "--force")
         self.assertEqual(code, 2)
         self.assertEqual(out, "")
-        self.assertIn(f"--from {target} is a symbolic link. Without --out, the rule file is written back to the --from file, so give the rule file another name with --out, such as ", err)
+        self.assertIn(f"--from {target} is a symbolic link, so nothing was written. Without --out, the rule file is written back to the --from file, so give the rule file another name with --out, or give the real file with --out.", err)
 
     def test_a_refused_real_symlink_run_prints_nothing_on_stdout(self):
         real = self._rules()
