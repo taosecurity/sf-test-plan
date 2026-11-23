@@ -564,6 +564,9 @@ def cmd_ngplus(args) -> int:
             _report(p)
         print("Nothing written: fix the errors above first.")
         return 1
+    if base.ngplus_checks:
+        raise SetupError(f"the --base plan {args.base} has a New Game+ section, which the shared plan would leave "
+                         "out. Move those checks into a numbered group of the base plan.")
     seen: dict[str, str] = {}
     for p in plans:
         name = ngplus.mod_name(p)

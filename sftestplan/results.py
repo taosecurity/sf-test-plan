@@ -323,7 +323,8 @@ def logs_to_marks(plan: Plan, report: dict, mod: str | None, now: str) -> tuple[
             verdict = "PASS"
         else:
             verdict = "NOT SEEN"
-        bits = [f"{rid} {s}" if s else f"{rid} isn't in the report" for rid, s in sts.items()]
+        bits = [f"{rid} {s}" if s else (f"{rid} has no status in the report" if rid in rules
+                                        else f"{rid} isn't in the report") for rid, s in sts.items()]
         lines.append(f"{c.id} log check {verdict}: {'; '.join(bits)}.")
         log.debug("log check %s: %s", c.id, verdict)
     return marks, lines
