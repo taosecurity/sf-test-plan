@@ -110,7 +110,7 @@ class BuildsTests(unittest.TestCase):
         b = self.zip("b.zip", {"Mod - Main.ba2": ba2({"Scripts/Q.pex": pex(b"BODY", 2)})})
         code, out, _ = self.compare(a, b)
         self.assertEqual(code, 0, out)
-        self.assertIn("compile times ignored", out)
+        self.assertIn("scripts compared by meaning", out)
 
     def test_ba2_stored_unpacked_same(self):
         a = self.zip("a.zip", {"M.ba2": ba2({"q.pex": pex(b"B", 1)}, packed=False)})
@@ -301,6 +301,11 @@ class BuildsTests(unittest.TestCase):
         code, out, _ = run("check-build", plan, "--built", built, "--pins", self.pins("mod.esm", sa, sb))
         self.assertEqual(code, 0, out)
         self.assertIn("WARNING:", out)
+
+    def test_tested_zip_relative_to_plan_as_given(self):
+        self.assertEqual(builds.tested_zip_from_plan(os.path.join("examples", "p.md"), "M-0.1.0.zip"),
+                         os.path.join("examples", "M-0.1.0.zip"))
+        self.assertEqual(builds.tested_zip_from_plan("p.md", "M-0.1.0.zip"), "M-0.1.0.zip")
 
     def test_tested_zip_absolute_kept(self):
         absolute = os.path.join(self.d, "x.zip")

@@ -2,8 +2,8 @@
 
 Read only. Plugin entries (.esm, .esp, .esl, .ba2) are compared by CRC-32 and size first. A .ba2 that differs is
 copied, one at a time, to a temporary file and opened: each file inside is compared by its unpacked content, and a
-.pex script is compared with the 8-byte compile time in its header zeroed, so a recompile of the same source still
-matches. When neither zip has a plugin (a DLL-only zip), every file entry is compared instead.
+.pex script is compared by meaning (pex.listing: compile time and string-table order ignored), so a recompile of the
+same source still matches. A script that listing() can't read is compared by its bytes with the compile time zeroed. When neither zip has a plugin (a DLL-only zip), every file entry is compared instead.
 """
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ import tempfile
 import zipfile
 import zlib
 
+from . import pex
 from .model import SetupError
 
 log = logging.getLogger("sf-test-plan")
@@ -28,6 +29,7 @@ COMPARE_FORMAT = "sf-test-plan-compare/1"
 _SHA16 = re.compile(r"[0-9a-f]{16}")
 _CHUNK = 1 << 20
 _PEX_MAGIC = (b"\xde\xc0\x57\xfa", b"\xfa\x57\xc0\xde")
+_PEX_MAX = 16 << 20   # a script larger than this is compared by bytes, without reading it whole
 
 
 class BA2Unreadable(Exception):
@@ -154,11 +156,19 @@ def _entry_digest(f, method: int, e, size: int) -> str:
     h = hashlib.sha256()
     if e["tex"] is not None:
         h.update(repr(e["tex"]).encode("ascii"))
-    first = True
-    for data in _unpacked_chunks(f, method, e["chunks"], size):
-        if first and e["name"].endswith(".pex") and len(data) >= 16 and data[:4] in _PEX_MAGIC:
+    stated = sum(c[2] for c in e["chunks"])
+    if e["name"].endswith(".pex") and stated <= _PEX_MAX:
+        data = b"".join(_unpacked_chunks(f, method, e["chunks"], size))
+        try:
+            h.update("\n".join(pex.listing(data)).encode("utf-8"))   # by meaning: string-table order ignored
+            return h.hexdigest()[:16]
+        except pex.PexError as err:
+            log.debug("%s: compared by bytes (compile time zeroed) because %s", e["name"], err)
+        if len(data) >= 16 and data[:4] in _PEX_MAGIC:
             data = data[:8] + b"\0" * 8 + data[16:]   # zero the compile time
-        first = False
+        h.update(data)
+        return h.hexdigest()[:16]
+    for data in _unpacked_chunks(f, method, e["chunks"], size):
         h.update(data)
     return h.hexdigest()[:16]
 
@@ -268,7 +278,7 @@ def _compare(tested: str, built: str, pins: dict) -> dict:
                 else:
                     diff = sorted(k for k in set(da) | set(db) if da.get(k) != db.get(k))
                     if not diff:
-                        add(name, "same", "the files inside match (script compile times ignored)")
+                        add(name, "same", "the files inside match (scripts compared by meaning)")
                         continue
                     shown = ", ".join(diff[:5]) + (f" and {len(diff) - 5} more" if len(diff) > 5 else "")
                     detail = f"{len(diff)} of its files differ ({shown}); {detail}"
@@ -304,10 +314,11 @@ def as_json(result: dict) -> str:
 
 
 def tested_zip_from_plan(plan_path: str, zip_value: str) -> str:
-    """The plan's zip: value, resolved against the plan's own folder unless it is absolute."""
+    """The plan's zip: value, resolved against the plan's own folder unless it is absolute. The plan's folder is
+    kept as the user gave it, so a report names examples\\Mod-0.1.0.zip, not a long absolute path."""
     if not zip_value:
         raise SetupError(f"the plan {plan_path} has no zip: line, so there is no tested zip. Add zip: to the "
                          "plan's header or give --tested.")
     if os.path.isabs(zip_value):
         return zip_value
-    return os.path.join(os.path.dirname(os.path.abspath(plan_path)), zip_value)
+    return os.path.join(os.path.dirname(plan_path), zip_value)

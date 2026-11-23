@@ -244,7 +244,7 @@ Marks saved on the full page are found on the fragment, and the other way round.
 
 ### compare-builds and check-build
 
-After a test round, these say whether the zip you tested is the build you are about to release. `compare-builds` compares the plugin files in two zips (a `.esm`, `.esp` or `.esl` by checksum, and each `.ba2` by what is inside it, so a different archive packing alone is not a difference). The exit code is 0 when they match and 1 when they differ:
+After a test round, these say whether the zip you tested is the build you are about to release. `compare-builds` compares the plugin files in two zips (a `.esm`, `.esp` or `.esl` by checksum, and each `.ba2` by what is inside it, so a different archive packing alone is not a difference). A Papyrus script (`.pex`) inside an archive is compared by what it does, so recompiling the same source, which gives the script a new compile time and a new order of its names, is not a difference either. The exit code is 0 when they match and 1 when they differ:
 
 ```
 > sf-test-plan compare-builds BeaconMod-0.1.0.zip BeaconMod-0.1.1.zip
@@ -270,7 +270,7 @@ OK: the built zip has the same plugins as the tested zip.
 
 ```
 > sf-test-plan check-build examples\Beacon.testplan.md --built BeaconMod-0.1.1.zip
-The tested zip is not the current build. The tested zip is BeaconMod-0.1.0.zip, and the built zip is BeaconMod-0.1.1.zip. BeaconMod.esm differs: the tested zip's copy has sha256 b24d0704d411a3ed, and the built zip's copy has d31fc532bc45d48d. Rebuild the test zip from the current build, or give the plan a new run: and zip:.
+The tested zip is not the current build. The tested zip is examples\BeaconMod-0.1.0.zip, and the built zip is BeaconMod-0.1.1.zip. BeaconMod.esm differs: the tested zip's copy has sha256 b24d0704d411a3ed, and the built zip's copy has d31fc532bc45d48d. Rebuild the test zip from the current build, or give the plan a new run: and zip:.
 ```
 
 ### Log checks

@@ -6,7 +6,7 @@ This release adds what a team that keeps many plans needs: a check that the test
 
 ### What's new
 
-- `compare-builds <tested> <built>` and `check-build <plan> --built <zip>` say whether two mod zips hold the same plugins. A plugin file is compared by checksum, and a `.ba2` by what is inside it. Exit 0 means the same, 1 different, 2 bad input. `--json` prints the result, and `--pins FILE` accepts a known pair of differences as a warning.
+- `compare-builds <tested> <built>` and `check-build <plan> --built <zip>` say whether two mod zips hold the same plugins. A plugin file is compared by checksum, and a `.ba2` by what is inside it, with each Papyrus script compared by what it does (a recompile of the same source matches). Exit 0 means the same, 1 different, 2 bad input. `--json` prints the result, and `--pins FILE` accepts a known pair of differences as a warning.
 - A `## Log checks` section holds checks that someone does in the logs after play. The page shows them as a table with no Pass or Fail control, outside the tally. A `logcheck:` line on a check adds "Check in the log:" under it. `build --rules` adds a table of what each log line in the rule file means.
 - A `## New Game+` section holds a mod's New Game+ checks and leaves them off its page. The `ngplus:` header line links the shared page, and `sf-test-plan ngplus` writes the shared plan, with group numbers fixed by an order file.
 - `check`, `build` and `render` take `--style FILE` (format `sf-test-plan-style/1`): smoke count, ISO dates, full sentences and banned words, each with its fix. `examples\style.json` is a sample.
