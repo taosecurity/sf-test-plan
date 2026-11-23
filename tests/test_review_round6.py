@@ -47,13 +47,21 @@ class Round6(unittest.TestCase):
         self.assertIn("results file", err)
         self.assertEqual(self.res_text(), "[]")
 
+    @unittest.skipUnless(hasattr(os, "link"), "no hard links here")
     def test_logs_refusal_hint_is_another_name(self):
-        rep = os.path.join(self.d, "r.marks.json")
+        # The default marks name is itself a hard link to the plan, so the hint must not name it (round 7:
+        # the round 6 version of this test used a case where the old hint was already different).
+        rep = os.path.join(self.d, "r.json")
         with open(rep, "w", encoding="utf-8") as f:
             json.dump(REPORT, f)
-        code, out, err = run("logs", rep, "--plan", self.plan, "--out", rep)
+        default = os.path.join(self.d, "r.marks.json")
+        try:
+            os.link(self.plan, default)
+        except OSError:
+            self.skipTest("can't make a hard link here")
+        code, out, err = run("logs", rep, "--plan", self.plan, "--out", self.plan)
         self.assertEqual(code, 2, out + err)
-        self.assertNotIn("such as " + rep + ".", err)
+        self.assertIn("such as " + os.path.join(self.d, "r.marks-2.json") + ".", err)
 
     def test_free_name_avoids_protected_files(self):
         taken = os.path.join(self.d, "q.html")

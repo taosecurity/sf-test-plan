@@ -72,10 +72,11 @@ def cmd_build(args) -> int:
     out = args.out or _default_out(args.plan)
     protected = (args.plan, results.results_path(args.plan))
     hint = _free_name(_default_out(args.plan), protected)
+    given = f"--out {out}" if args.out else f"The default page {out}"
     if _same_file(out, args.plan):
-        raise SetupError(f"--out {out} is the plan itself. Give the page another name, such as {hint}.")
+        raise SetupError(f"{given} is the plan itself. Give the page another name with --out, such as {hint}.")
     if _same_file(out, protected[1]):
-        raise SetupError(f"--out {out} is the plan's results file. Give the page another name, such as {hint}.")
+        raise SetupError(f"{given} is the plan's results file. Give the page another name with --out, such as {hint}.")
     if os.path.isdir(out):
         raise SetupError(f"{out} is a folder, not a page file. Give a file name with --out, such as {out}{os.sep}page.html.")
     html = render.render(plan, rows)
@@ -119,9 +120,10 @@ def cmd_logs(args) -> int:
     guarded = ((args.plan, "the plan"), (args.report, "the report"),
                (results.results_path(args.plan), "the plan's results file"))
     hint = _free_name(os.path.splitext(args.report)[0] + ".marks.json", [p for p, _ in guarded])
+    given = f"--out {out}" if args.out else f"The default marks file {out}"
     for other, what in guarded:
         if _same_file(out, other):
-            raise SetupError(f"--out {out} is {what} itself. Give the marks file another name, such as {hint}.")
+            raise SetupError(f"{given} is {what} itself. Give the marks file another name with --out, such as {hint}.")
     if os.path.isdir(out):     # before any output, so a refused run prints only its error
         raise SetupError(f"{out} is a folder, not a marks file. Give a file name with --out, such as {out}{os.sep}marks.json.")
     marks, lines = results.logs_to_marks(plan, report, args.mod, _now())
@@ -178,21 +180,32 @@ def _count(n: int, word: str) -> str:
 
 
 def _same_file(a: str, b: str) -> bool:
-    """True when a and b are the same file: same real path, or (both exist) a hard link to one file."""
+    """True when a and b are the same file: same real path, or (both exist) a hard link to one file.
+
+    The hard-link test trusts file ids only when they are non-zero: some drives (certain network shares,
+    RAM disks, \\\\wsl$ mounts) give every file the id 0, and os.path.samefile would call them all one file.
+    """
     if os.path.normcase(os.path.realpath(a)) == os.path.normcase(os.path.realpath(b)):
         return True
     try:
-        return os.path.samefile(a, b)
-    except OSError:
+        sa, sb = os.stat(a), os.stat(b)
+    except (OSError, ValueError):
         return False
+    return sa.st_ino != 0 and (sa.st_ino, sa.st_dev) == (sb.st_ino, sb.st_dev)
 
 
 def _free_name(default: str, protected) -> str:
-    """default, or default with "-2" before its ending when it is one of the protected files (for a hint)."""
-    if not any(_same_file(default, p) for p in protected):
+    """A name for a refusal hint: default when it isn't one of the protected files, else default with "-2",
+    "-3" ... before its ending, the first that is neither a protected file nor already on disk."""
+    def free(name):
+        return not any(_same_file(name, p) for p in protected)
+    if free(default):
         return default
     stem, ext = os.path.splitext(default)
-    return f"{stem}-2{ext}"
+    n = 2
+    while not free(f"{stem}-{n}{ext}") or os.path.lexists(f"{stem}-{n}{ext}"):
+        n += 1
+    return f"{stem}-{n}{ext}"
 
 
 def _ascii(s: str) -> str:
@@ -259,10 +272,17 @@ def cmd_rules(args) -> int:
     out = args.out or (args.from_file if args.from_file else _default_rules_out(args.plan))
     protected = (args.plan, results.results_path(args.plan))
     hint = _free_name(_default_rules_out(args.plan), protected)
+    # Without --out the rule file is the --from file, so a refusal names the option the path came from.
+    if args.out:
+        given = f"--out {out}"
+    elif args.from_file:
+        given = f"--from {out} (without --out, the rule file is written back to the --from file)"
+    else:
+        given = f"The default rule file {out}"
     if _same_file(out, args.plan):
-        raise SetupError(f"--out {out} is the plan itself. Give the rule file another name, such as {hint}.")
+        raise SetupError(f"{given} is the plan itself. Give the rule file another name with --out, such as {hint}.")
     if _same_file(out, protected[1]):
-        raise SetupError(f"--out {out} is the plan's results file. Give the rule file another name, such as {hint}.")
+        raise SetupError(f"{given} is the plan's results file. Give the rule file another name with --out, such as {hint}.")
     if os.path.isdir(out):
         raise SetupError(f"{out} is a folder, not a rule file. Give a file name with --out, such as "
                          f"{out}{os.sep}rules.json.")
