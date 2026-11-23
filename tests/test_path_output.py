@@ -21,6 +21,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ENTRY = os.path.join(ROOT, "sf_test_plan.py")
 EXAMPLE = os.path.join(ROOT, "examples", "Beacon.testplan.md")
 REPORT = os.path.join(ROOT, "tests", "fixtures", "logcheck-beacon.json")
+sys.path.insert(0, ROOT)            # as the other test modules do
+
+from sftestplan import cli  # noqa: E402
 
 SNOWMAN = "plan-☃"                       # not in cp1252
 # On Linux, the name Python gives a file whose bytes aren't UTF-8; Windows takes the same lone surrogates as a name.
@@ -107,10 +110,32 @@ class PathOutput(unittest.TestCase):
             code, out, err = self._run("ascii", "rules", plan, "--out", out_file)
             text = (out + err).decode("utf-8")
             self.assertEqual(code, 0, text)
-            self.assertNotIn("escape", text)
+            self.assertIn(f"Rule file: {_shown(out_file)}.", text)
             with open(out_file, encoding="utf-8") as f:
                 data = json.load(f)
             self.assertEqual(data["mod"], _shown(stem).replace("?", "") + "-nomod")
+
+    def test_mod_from_path(self):
+        """No file system needed, so this also runs where the OS refuses such names (macOS)."""
+        self.assertEqual(cli._mod_from_path(os.path.join("x", "Beacon.testplan.md")), "Beacon")
+        self.assertEqual(cli._mod_from_path("plan-\udcff\udcfe-nomod.testplan.md"), "plan--nomod")
+        self.assertEqual(cli._mod_from_path("\udcff\udcfe.testplan.md"), "My Mod")   # nothing left: the default
+        self.assertEqual(cli._mod_from_path(SNOWMAN + ".md"), SNOWMAN)
+
+    @unittest.skipIf(not _can_make("\udcff\udcfe"), "this file system refuses the name")
+    def test_rules_name_all_undecodable_gets_default_mod(self):
+        """Code review round 2 of 0.3.1: a name with nothing valid left wrote "mod": "" into the rule file."""
+        with tempfile.TemporaryDirectory() as top:
+            plan = os.path.join(top, "\udcff\udcfe.testplan.md")
+            with open(EXAMPLE, encoding="utf-8") as f:
+                body = "".join(line for line in f if not line.startswith("mod:"))
+            with open(plan, "w", encoding="utf-8") as f:
+                f.write(body)
+            out_file = os.path.join(top, "r.json")
+            code, out, err = self._run("utf-8", "rules", plan, "--out", out_file)
+            self.assertEqual(code, 0, (out + err).decode("utf-8"))
+            with open(out_file, encoding="utf-8") as f:
+                self.assertEqual(json.load(f)["mod"], "My Mod")
 
     def test_plan_file_name_unshowable(self):
         self._plan_named(SNOWMAN)
@@ -120,8 +145,6 @@ class PathOutput(unittest.TestCase):
         self._plan_named(UNDECODABLE)
 
     def test_new_mod_not_unicode_is_refused_before_writing(self):
-        sys.path.insert(0, ROOT)
-        from sftestplan import cli
         with tempfile.TemporaryDirectory() as top:
             plan = os.path.join(top, "Keep.testplan.md")
             with open(plan, "w", encoding="utf-8") as f:

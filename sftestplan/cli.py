@@ -132,9 +132,13 @@ def _default_rules_out(plan_path: str) -> str:
 def _mod_from_path(path: str) -> str:
     """The mod name a plan's file name gives ("Beacon.testplan.md" -> "Beacon"). A file name that isn't valid
     Unicode (Linux bytes, read as lone surrogates) loses those characters, since a plan or rule file is saved as
-    UTF-8 and can't hold them (0.3.1). Empty is fine: the starters use their own default name."""
+    UTF-8 and can't hold them (0.3.1). "My Mod" if nothing is left, as in the starter plan."""
     name = os.path.basename(path).split(".")[0]
-    return name.encode("utf-8", "ignore").decode("utf-8")
+    kept = name.encode("utf-8", "ignore").decode("utf-8")
+    if kept != name:
+        log.debug("the file name %r isn't valid Unicode: mod name %r (give --mod or a mod: line to set it)",
+                  name, kept)
+    return kept or "My Mod"
 
 
 def _count(n: int, word: str) -> str:
@@ -281,12 +285,12 @@ def cmd_new(args) -> int:
     if os.path.exists(args.plan) and not args.force:
         raise SetupError(f"{args.plan} already exists. Pick another name, or add --force to replace it.")
     mod = args.mod or _mod_from_path(args.plan)
-    text = results.starter_plan(mod)
     try:
-        text.encode("utf-8")      # checked before the file is opened, so a refused run never empties a plan
+        mod.encode("utf-8")       # checked before the file is opened, so a refused run never empties a plan
     except UnicodeError as e:
         raise SetupError(f"--mod holds text that can't be saved as UTF-8 ({e.reason}). Give the mod's name in "
                          f"plain text. Nothing was written.")
+    text = results.starter_plan(mod)
     try:
         with open(args.plan, "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
