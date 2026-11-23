@@ -576,6 +576,13 @@ def cmd_ngplus(args) -> int:
         if name in seen:
             raise SetupError(f"the mod {json.dumps(name)} is in both {seen[name]} and {p.path}. Give each mod once.")
         seen[name] = p.path
+    if base.zip and not os.path.isabs(base.zip):
+        # zip: is read from the plan's own folder (check-build), so point it from the shared plan's folder
+        where = os.path.abspath(builds.tested_zip_from_plan(args.base, base.zip))
+        try:
+            base.zip = os.path.relpath(where, os.path.dirname(os.path.abspath(args.out))).replace(os.sep, "/")
+        except ValueError:   # --out is on another drive
+            base.zip = where
     text, new_order, summary = ngplus.shared_plan(base, plans, order)
     check = parse.parse_text(text, args.out)
     dups = [e for e in check.errors() if e.code == "dup-id"]

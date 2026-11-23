@@ -277,7 +277,11 @@ def logs_to_marks(plan: Plan, report: dict, mod: str | None, now: str) -> tuple[
     log_checks = [c for c in plan.checks() if c.log]
     log_only = [c for c in plan.log_checks if c.log]
     if not log_checks and not log_only:
-        lines.append("The plan has no checks with log: ids, so there is nothing to mark.")
+        if any(c.log for c in plan.ngplus_checks):
+            lines.append("Only the plan's New Game+ checks have log: ids. They are marked on the shared New Game+ "
+                         "plan: run logs with --plan set to that plan.")
+        else:
+            lines.append("The plan has no checks with log: ids, so there is nothing to mark.")
     elif not log_checks:
         lines.append("No page check has log: ids, so the marks file has no marks. The Log checks are below.")
     for c in log_checks:

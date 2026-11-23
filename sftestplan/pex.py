@@ -46,6 +46,15 @@ class PexError(Exception):
     pass
 
 
+def text(raw: bytes) -> str:
+    """Decode a stored string without losing bytes: UTF-8 when it is valid, else Latin-1 (which keeps every byte), so two
+    different strings never decode to the same text. Non-ASCII text may be stored as UTF-8 or as Windows-1252."""
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return raw.decode("latin-1")
+
+
 class _Reader:
     def __init__(self, data: bytes):
         self.b, self.p = data, 0
@@ -82,7 +91,7 @@ class _Reader:
     def wstr(self) -> str:
         n = self.u16()
         self.need(n)
-        s = self.b[self.p:self.p + n].decode("utf-8", "replace")
+        s = text(self.b[self.p:self.p + n])
         self.p += n
         return s
 

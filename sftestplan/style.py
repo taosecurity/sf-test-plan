@@ -228,7 +228,13 @@ def apply(plan: Plan, text: str, st: Style) -> list[Problem]:
     if st.iso_dates or st.banned:
         banned = [(w, use, re.compile(r"(?<!\w)" + r"\s+".join(re.escape(x) for x in w.split()) + r"(?!\w)", re.I))
                   for w, use in st.banned]
+        in_fence = False
         for n, raw in lines:
+            if raw.lstrip().startswith("```"):   # a fenced code block (a command or log sample) isn't prose
+                in_fence = not in_fence
+                continue
+            if in_fence:
+                continue
             km = _KEY_RE.match(raw)
             if km and km.group(1).lower() in _DATA_KEYS:
                 continue

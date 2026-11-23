@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import lzma
 import os
 import re
 import shutil
@@ -130,7 +131,7 @@ def _ba2_entries(f, size: int):
     f.seek(names_at)
     for e in entries:
         (n,) = struct.unpack("<H", _read(f, 2))
-        e["name"] = _read(f, n).decode("utf-8", "replace").replace("\\", "/").lower()
+        e["name"] = pex.text(_read(f, n)).replace("\\", "/").lower()   # lossless, so two names never merge
     return method, entries
 
 
@@ -245,7 +246,7 @@ def compare(tested: str, built: str, pins: dict | None = None) -> dict:
     """The compare-builds result (the --json shape): same, problems, warnings, entries."""
     try:
         return _compare(tested, built, pins or {})
-    except (zipfile.BadZipFile, zlib.error, EOFError, NotImplementedError, RuntimeError) as e:
+    except (zipfile.BadZipFile, zlib.error, lzma.LZMAError, EOFError, NotImplementedError, RuntimeError) as e:
         raise SetupError(f"can't read a file inside {tested} or {built}: {e}. Check that both are whole, "
                          "unencrypted mod zips.")
     except OSError as e:
