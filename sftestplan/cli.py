@@ -541,6 +541,7 @@ def cmd_check_build(args) -> int:
 def cmd_ngplus(args) -> int:
     inputs = [(args.base, "the --base plan")] + [(p, f"the plan {p}") for p in args.plans]
     fix = "Give the shared plan another name with --out"
+    inputs += [(results.results_path(p), f"the results file of {p}") for p in [args.base] + args.plans]
     for path, what in inputs + [(args.order, "the --order file")]:
         if _same_file(args.out, path):
             raise SetupError(f"--out {args.out} is {what}. {fix}.")

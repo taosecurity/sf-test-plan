@@ -181,12 +181,17 @@ def _sentence_ok(text: str, check_start: bool = True) -> str:
 
 def _find_line(lines: list[tuple[int, str]], text: str, start: int = 0) -> int:
     """The first line at or after `start` that holds the start of `text` (0 if none)."""
-    probe = text.strip().split("\n", 1)[0][:40].strip()
-    if not probe:
-        return 0
-    for n, raw in lines:
-        if n >= start and probe in raw:
-            return n
+    words = text.strip().split("\n", 1)[0][:40].split()
+    # A paragraph is joined from its source lines, so a probe that runs past a short first line matches nothing:
+    # drop words from the end until it fits on one line (two words at least, so it stays specific).
+    while words:
+        probe = " ".join(words)
+        for n, raw in lines:
+            if n >= start and probe in raw:
+                return n
+        if len(words) <= 2:
+            break
+        words.pop()
     return 0
 
 

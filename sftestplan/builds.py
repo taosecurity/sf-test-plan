@@ -131,7 +131,7 @@ def _ba2_entries(f, size: int):
     f.seek(names_at)
     for e in entries:
         (n,) = struct.unpack("<H", _read(f, 2))
-        e["name"] = pex.text(_read(f, n)).replace("\\", "/").lower()   # lossless, so two names never merge
+        e["name"] = pex.text(_read(f, n)).replace("\\", "/").lower()   # bytes kept; case folded as the game does
     return method, entries
 
 
