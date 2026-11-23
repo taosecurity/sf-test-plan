@@ -121,6 +121,8 @@ class PathOutput(unittest.TestCase):
         self.assertEqual(cli._mod_from_path("plan-\udcff\udcfe-nomod.testplan.md"), "plan--nomod")
         self.assertEqual(cli._mod_from_path("\udcff\udcfe.testplan.md"), "My Mod")   # nothing left: the default
         self.assertEqual(cli._mod_from_path(SNOWMAN + ".md"), SNOWMAN)
+        self.assertEqual(cli._mod_from_path("\udcff \udcfe.testplan.md"), "My Mod")   # only a space left (round 3)
+        self.assertEqual(cli._mod_from_path(".testplan.md"), "My Mod")
 
     @unittest.skipIf(not _can_make("\udcff\udcfe"), "this file system refuses the name")
     def test_rules_name_all_undecodable_gets_default_mod(self):

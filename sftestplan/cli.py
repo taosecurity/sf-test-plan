@@ -134,11 +134,11 @@ def _mod_from_path(path: str) -> str:
     Unicode (Linux bytes, read as lone surrogates) loses those characters, since a plan or rule file is saved as
     UTF-8 and can't hold them (0.3.1). "My Mod" if nothing is left, as in the starter plan."""
     name = os.path.basename(path).split(".")[0]
-    kept = name.encode("utf-8", "ignore").decode("utf-8")
+    kept = " ".join(name.encode("utf-8", "ignore").decode("utf-8").split()) or "My Mod"
     if kept != name:
-        log.debug("the file name %r isn't valid Unicode: mod name %r (give --mod or a mod: line to set it)",
-                  name, kept)
-    return kept or "My Mod"
+        log.debug("mod name %r from the file name %r (characters that aren't valid Unicode or spaces are left "
+                  "out, and \"My Mod\" is used when nothing is left; give --mod or a mod: line to set it)", kept, name)
+    return kept
 
 
 def _count(n: int, word: str) -> str:
@@ -291,6 +291,11 @@ def cmd_new(args) -> int:
         raise SetupError(f"--mod holds text that can't be saved as UTF-8 ({e.reason}). Give the mod's name in "
                          f"plain text. Nothing was written.")
     text = results.starter_plan(mod)
+    try:
+        text.encode("utf-8")      # and the whole text, in case the starter ever adds text from elsewhere
+    except UnicodeError as e:
+        raise SetupError(f"the starter plan holds text that can't be saved as UTF-8 ({e.reason}). Nothing was "
+                         f"written.")
     try:
         with open(args.plan, "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
