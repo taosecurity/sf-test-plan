@@ -40,7 +40,7 @@ Broken.testplan.md: 3 groups, 6 checks, 5 smoke; 1 errors, 0 warnings
 ## Install (two minutes)
 
 1. Install Python 3.11 or newer from [python.org](https://www.python.org/downloads/). On the first screen of the installer, tick **Add python.exe to PATH**. To check that it worked, open a new Command Prompt and type `python --version`. It should print a version number. (sf-test-plan itself needs Python 3.10 or newer, and is tested on 3.10 and 3.13 on Windows and Linux.)
-2. Download `sf-test-plan-0.3.2.zip` from the [releases page](https://github.com/taosecurity/sf-test-plan/releases) and unpack it anywhere.
+2. Download `sf-test-plan-0.4.0.zip` from the [releases page](https://github.com/taosecurity/sf-test-plan/releases) and unpack it anywhere.
 3. Open the unpacked folder in File Explorer, click the address bar at the top, type `cmd` and press Enter. A Command Prompt window opens in that folder, ready for the commands below.
 4. Build the example page with `sf-test-plan build examples\Beacon.testplan.md`, as in the Example above, and open `examples\Beacon.testplan.html` in your browser.
 
@@ -113,18 +113,24 @@ The whole format, every warning and every file sf-test-plan reads or writes are 
 
 | Command | What it does |
 |---|---|
-| `sf-test-plan build PLAN [--out PAGE] [--rules FILE]` | Checks the plan and writes the page (default: the plan's name with `.html`). |
-| `sf-test-plan check PLAN [--rules FILE]` | Checks the plan for mistakes without writing anything. With `--rules`, it also checks every `log:` id against a papyrus-log-check rule file. |
+| `sf-test-plan build PLAN [--out PAGE] [--rules FILE] [--style FILE]` | Checks the plan and writes the page (default: the plan's name with `.html`). |
+| `sf-test-plan check PLAN [--rules FILE] [--style FILE]` | Checks the plan for mistakes without writing anything. With `--rules`, it also checks every `log:` id against a papyrus-log-check rule file. With `--style`, it also checks your own writing rules. |
 | `sf-test-plan import MARKS --plan PLAN` | Adds a marks file (from the page's Export button) to `<plan>.results.json` as one results row, and prints the tally. Build again to show it on the page. |
 | `sf-test-plan logs REPORT --plan PLAN [--mod NAME] [--out MARKS]` | Reads a papyrus-log-check JSON report and writes marks for the steps with `log:` ids. Import them on the page, or with `import`. |
 | `sf-test-plan rules PLAN [--out FILE] [--from FILE] [--prefix TEXT] [--plugin NAME] [--force]` | Writes a starter papyrus-log-check rule file with a rule for each `log:` id in the plan, or adds the missing ids to the rule file you already have. |
 | `sf-test-plan new PLAN [--mod NAME] [--force]` | Writes a starter plan. |
+| `sf-test-plan render PLAN [--fragment] [--out FILE] [--assets DIR] [--force]` | Writes the page, or with `--fragment` only the part a host page embeds. See "render" below. |
+| `sf-test-plan compare-builds TESTED BUILT [--pins FILE] [--json]` | Says whether two mod zips hold the same plugins. |
+| `sf-test-plan check-build PLAN --built ZIP [--tested ZIP] [--pins FILE] [--json]` | Says whether the plan's tested zip holds the same plugins as a new build. |
+| `sf-test-plan ngplus --base FILE --order FILE --out FILE PLAN...` | Writes one shared New Game+ plan from several mods' plans. |
 
 Every command also takes `--verbose` and `--log FILE`. The exit codes are:
 
-- **0** means the command finished. Warnings are fine.
-- **1** means the plan has errors. Each one is printed with its line number and the fix.
-- **2** means a file can't be read or written, or an option is wrong.
+| Exit code | Meaning |
+|---|---|
+| 0 | The command finished. Warnings are fine. `--help` always exits 0. For `compare-builds` and `check-build`, 0 also means the two zips have the same plugins. |
+| 1 | The plan has errors (each one is printed with its line number and the fix). For `compare-builds` and `check-build`, 1 means the zips differ. |
+| 2 | A file can't be read or written, or an option is wrong. |
 
 `build`, `logs` and `rules` never write over the plan or the plan's results file, `logs` never writes over its report, and `build` never writes over its `--rules` file. They also refuse an output that is a symbolic link, a read-only file or something other than a regular file. In each case the command stops with exit 2, writes nothing, and names the file (from `--out`, `--from` or the default name) and the fix, usually to give another name with `--out`. The null device (`NUL` on Windows, `/dev/null` elsewhere) is allowed as an output. `rules` checks for a link or a read-only file only when it would write, so a linked `--from` file with nothing to add still exits 0.
 
@@ -214,6 +220,121 @@ Already in examples\Beacon.logrules.json: 3 of the 3 ids.
 Nothing to add, so nothing was written.
 ```
 
+### render
+
+`render` writes the same page as `build`, to `--out` (or to stdout, with the report on stderr). With `--fragment` it writes only the checklist, inside `<div class="sf-test-plan">`, with no styles, no inline script and no footer, so a web page of your own can hold it. `--assets DIR` also writes `sf-test-plan.js` and `sf-test-plan.css` into DIR (it makes the folder, and it replaces a file that has other contents only with `--force`). The host page links the stylesheet, has a viewport meta tag, and loads the script after the fragment. It holds one fragment:
+
+```
+> sf-test-plan render examples\Beacon.testplan.md --fragment --out frag.html --assets assets
+examples\Beacon.testplan.md: 3 groups, 6 checks, 5 smoke; 0 errors, 0 warnings
+Wrote: assets\sf-test-plan.js
+Wrote: assets\sf-test-plan.css
+Fragment: frag.html
+```
+
+```html
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/sf-test-plan.css">
+...
+<!-- the contents of frag.html here -->
+<script src="assets/sf-test-plan.js"></script>
+```
+
+Marks saved on the full page are found on the fragment, and the other way round. FORMAT.md says what the fragment holds.
+
+### compare-builds and check-build
+
+After a test round, these say whether the zip you tested is the build you are about to release. `compare-builds` compares the plugin files in two zips (a `.esm`, `.esp` or `.esl` by checksum, and each `.ba2` by what is inside it, so a different archive packing alone is not a difference). The exit code is 0 when they match and 1 when they differ:
+
+```
+> sf-test-plan compare-builds BeaconMod-0.1.0.zip BeaconMod-0.1.1.zip
+BeaconMod.esm: differs: the tested zip's copy has sha256 b24d0704d411a3ed, and the built zip's copy has d31fc532bc45d48d
+DIFFERENT: 1 of 1 plugin files differ.
+```
+
+`--json` prints the result as JSON (format `sf-test-plan-compare/1`). `--pins FILE` names differences you have looked at and accepted. The pins file is JSON, with each plugin's lower-case file name and the first 16 hex digits of the two checksums that the report printed. Only that exact pair is accepted, and it is shown as a warning:
+
+```json
+{"format": "sf-test-plan-pins/1",
+ "pins": {"beaconmod.esm": {"tested": "b24d0704d411a3ed", "built": "d31fc532bc45d48d", "why": "rebuilt with the same content"}}}
+```
+
+```
+> sf-test-plan compare-builds BeaconMod-0.1.0.zip BeaconMod-0.1.1.zip --pins pins.json
+BeaconMod.esm: pinned: rebuilt with the same content
+WARNING: BeaconMod.esm differs, but the --pins file allows this exact pair: rebuilt with the same content
+OK: the built zip has the same plugins as the tested zip.
+```
+
+`check-build` does the same with the zip named by the plan's `zip:` line (relative to the plan's folder, or give `--tested`) and a new build given with `--built`:
+
+```
+> sf-test-plan check-build examples\Beacon.testplan.md --built BeaconMod-0.1.1.zip
+The tested zip is not the current build. The tested zip is BeaconMod-0.1.0.zip, and the built zip is BeaconMod-0.1.1.zip. BeaconMod.esm differs: the tested zip's copy has sha256 b24d0704d411a3ed, and the built zip's copy has d31fc532bc45d48d. Rebuild the test zip from the current build, or give the plan a new run: and zip:.
+```
+
+### Log checks
+
+Some checks are done in the logs after play, not on the page. Put them under a `## Log checks` heading, written like other checks. The page shows them as a table ("Checks in the logs") with no Pass or Fail buttons, and they are not counted in the tally. Their ids are `L.1`, `L.2` and so on. A single check can also carry a `logcheck:` line, which the page shows as "Check in the log:" under the step:
+
+```markdown
+## 1 Install
+- [ ] Start a new game and finish the character creator.
+  Expect: no error message.
+  logcheck: the log shows "BeaconMod: loaded" once.
+
+## Log checks
+- [ ] Look for errors in the Papyrus log.
+  Expect: none from BeaconMod.
+```
+
+`build --rules FILE` also adds a table of what each log line in the rule file means.
+
+### New Game+
+
+A mod that has its own New Game+ checks puts them under `## New Game+` (or `## NG+`). They are left off that mod's page. A header line such as `ngplus: ../NewGamePlus.html` puts a link to the shared page on the mod's page. To make the shared plan, give `ngplus` a base plan (the checks every mod shares), an order file and the mods' plans:
+
+```
+> sf-test-plan ngplus --base Base.testplan.md --order order.json --out NewGamePlus.testplan.md Styled.testplan.md
+Order file: order.json (added Beacon Mod)
+Group 2: Beacon Mod (1 check)
+Shared plan: NewGamePlus.testplan.md (1 mod). Then run: sf-test-plan build NewGamePlus.testplan.md
+```
+
+The order file is a JSON list of mod names. It fixes each mod's group number, so marks never move when a mod is added; new mods are added at the end. Build the shared plan as usual.
+
+### Style rules
+
+`--style FILE` on `check`, `build` and `render` also checks your own writing rules, from a JSON file. The release zip has `examples\style.json`:
+
+```json
+{
+  "format": "sf-test-plan-style/1",
+  "level": "error",
+  "smoke": {"min": 3, "max": 12},
+  "iso_dates": true,
+  "full_sentences": true,
+  "banned": [
+    "obviously",
+    {"word": "just", "use": "nothing (leave it out)"},
+    {"word": "slate", "use": "note"}
+  ]
+}
+```
+
+Here a plan has one smoke check, a step that doesn't end like a sentence, a date written 11/23/2026 and a banned word. Each is reported with the fix. With `"level": "error"`, a style problem makes the command exit 1 and `build` writes nothing:
+
+```
+> sf-test-plan check Styled.testplan.md --style examples\style.json
+Styled.testplan.md: error style-smoke: the plan has 1 smoke checks; the style file asks for at least 3. Mark more checks with 'smoke: yes'.
+Styled.testplan.md:8: error style-banned: 'just' is on the style file's banned list. Write 'nothing (leave it out)' instead.
+Styled.testplan.md:8: error style-sentence: check 1.1's step doesn't end with '.', '!', '?' or ':', so it isn't a full sentence. Write it as a full sentence.
+Styled.testplan.md:9: error style-date: the date '11/23/2026' isn't written as YYYY-MM-DD. Write it as 2026-11-23.
+Styled.testplan.md: 1 groups, 1 checks, 1 smoke; 4 errors, 0 warnings
+```
+
+FORMAT.md section 7 lists every key.
+
 ## The page
 
 - **Pass / Fail / Skip** on each step, and a note box. Click a chosen mark again to clear it.
@@ -246,7 +367,7 @@ This is what `--verbose` prints for the example plan:
 
 ```
 > sf-test-plan check examples\Beacon.testplan.md --verbose
-[verbose] sf-test-plan 0.3.2, Python 3.13.15, args ['check', 'examples\\Beacon.testplan.md', '--verbose']
+[verbose] sf-test-plan 0.4.0, Python 3.13.15, args ['check', 'examples\\Beacon.testplan.md', '--verbose']
 [verbose] read plan examples\Beacon.testplan.md (1356 characters)
 [verbose] parsed examples\Beacon.testplan.md: title 'Beacon Mod test plan', run 'beacon-0.1.0', 2 setup items, 3 groups, 6 checks (5 smoke), 0 problems
 [verbose]   group 1 'Install and load' (line 13): 1.1 smoke, 1.2 smoke

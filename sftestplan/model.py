@@ -5,7 +5,7 @@ import re
 from dataclasses import dataclass, field
 
 TOOL = "sf-test-plan"
-VERSION = "0.3.2"
+VERSION = "0.4.0"
 TOOL_ID = f"{TOOL} {VERSION}"
 URL = "https://github.com/taosecurity/sf-test-plan"
 
@@ -14,10 +14,12 @@ MARKS_FORMAT = "sf-test-plan-marks/1"
 RESULTS_FORMAT = "sf-test-plan-results/1"
 
 RUN_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
-HEADER_KEYS = ("run", "mod", "version", "zip")
-CHECK_KEYS = ("expect", "smoke", "log", "note", "id")
+HEADER_KEYS = ("run", "mod", "version", "zip", "ngplus")
+CHECK_KEYS = ("expect", "smoke", "log", "note", "id", "logcheck")
 SMOKE_WARN = 12
 SETUP_TITLE = "before you start"
+LOGS_TITLE = "log checks"
+NGPLUS_TITLES = ("new game+", "ng+")
 RESULTS = ("pass", "fail", "skip", "")
 
 # A <code> span whose whole text matches gets a Copy button (ported from the private kit's testplan.js, 2026-11-11).
@@ -59,6 +61,7 @@ class Check:
     log: list[str] = field(default_factory=list)
     line: int = 0
     pinned: bool = False
+    logcheck: str = ""      # "Check in the log:" text (FORMAT.md rule 13)
 
 
 @dataclass
@@ -82,8 +85,21 @@ class Plan:
     groups: list[Group] = field(default_factory=list)
     path: str = ""
     problems: list[Problem] = field(default_factory=list)
+    # "## Log checks" (FORMAT.md rule 12): checked in the logs after play, never marked on the page, so they are
+    # not in checks(), the tally or the export. log_line is the heading's line (0 when the plan has none).
+    log_checks: list[Check] = field(default_factory=list)
+    log_intro: str = ""
+    log_line: int = 0
+    # "## New Game+" (FORMAT.md rule 14): this mod's own NG+ checks, left off its page; `sf-test-plan ngplus` puts
+    # them in the shared NG+ plan. ngplus_line is the heading's line (0 when the plan has none). ngplus is the
+    # header key: a link to the shared page.
+    ngplus_checks: list[Check] = field(default_factory=list)
+    ngplus_intro: str = ""
+    ngplus_line: int = 0
+    ngplus: str = ""
 
     def checks(self) -> list[Check]:
+        """The checks marked on the page (the groups' checks; never the Log checks)."""
         return [c for g in self.groups for c in g.checks]
 
     def smoke(self) -> list[Check]:

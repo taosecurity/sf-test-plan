@@ -138,7 +138,7 @@ class PageTests(unittest.TestCase):
         html = render.render(plan)
         t = tree(html)
         self.assertEqual(json.loads(t.scripts["tp-config"])["title"], plan.title)
-        self.assertEqual(len(t.find("script")), 2)
+        self.assertEqual(len(t.find("script")), 3)   # tp-config, tp-logchecks (0.4.0) and the page script
         self.assertNotIn("<script>alert", html)
 
     def test_checks_and_attributes(self):
@@ -213,7 +213,7 @@ class PageTests(unittest.TestCase):
         self.assertNotIn("<script>alert", html)
         self.assertNotIn('href="javascript', html.lower())
         self.assertEqual(t.find("li", **{"class": "check"})[0]["data-log"], 'a"b')
-        self.assertEqual(len(t.find("script")), 2)
+        self.assertEqual(len(t.find("script")), 3)
 
     def test_missing_script_gives_empty_script(self):
         old = render.ASSETS

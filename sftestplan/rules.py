@@ -68,9 +68,10 @@ def default_tag(mod: str) -> str:
 
 
 def plan_log_uses(plan: Plan) -> dict[str, list[tuple[str, str]]]:
-    """Each `log:` id in the plan, in file order, with the steps that name it: {id: [(check id, plain step text)]}."""
+    """Each `log:` id in the plan, in file order (the groups' checks, then the Log checks), with the steps that name
+    it: {id: [(check id, plain step text)]}."""
     uses: dict[str, list[tuple[str, str]]] = {}
-    for c in plan.checks():
+    for c in plan.checks() + plan.log_checks:
         for rid in c.log:
             uses.setdefault(rid, []).append((c.id, plain_text(c.step, None)))   # `means` keeps the whole step
     return uses

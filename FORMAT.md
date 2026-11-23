@@ -41,6 +41,7 @@ Text right after a group heading is the group's introduction.
 2. **Header keys.** `key: value` lines right after the title (a blank line between the title and the first key is allowed). A blank line after the keys ends the header, so a later line such as `Warning: back up your saves.` is introduction text. Keys are case-insensitive.
    - `run` (required): a short id for this test round, such as `beacon-0.1.0`. Marks are saved under it, so a new build gets a new `run` and starts with empty marks. Allowed characters: letters, digits, `.`, `_`, `-`; 1 to 64 characters.
    - `mod`, `version`, `zip` (optional): shown in the page's facts box.
+   - `ngplus` (optional): the shared New Game+ page, as an `http://` or `https://` address or a path relative to this page (see 14). Any other value (another scheme such as `javascript:`, a drive path such as `C:\...`, a `//host` address) is an error (`bad-ngplus`).
    - Any other header key is a warning (`unknown header key`).
 3. **Introduction.** Any text after the header and before the first `## ` heading. Markdown inline only (see 6).
 4. **Before you start.** A `## Before you start` heading (case-insensitive) holds a bullet list (`- ` or `* `). It becomes the numbered setup list. Its items are not checks.
@@ -51,12 +52,16 @@ Text right after a group heading is the group's introduction.
    - `log: <rule id>[, <rule id> ...]`: papyrus-log-check rule ids that also prove this check.
    - `note: <text>`: a hint shown under the step in muted text.
    - `id: <g>.<n>`: pins the check's id. `<g>` must equal the group number.
-   - Any other indented line that isn't `key:` continues the field above it (the step, its Expect or its note), joined with a space. So does an unindented line right after the check with no blank line between (Markdown's lazy continuation), unless it starts a new bullet. An indented `key:` with an unknown key is a warning, and the line is kept as step text.
+   - `logcheck: <text>`: something to check in the logs for this check (see 13).
+   - Any other indented line that isn't `key:` continues the field above it (the step, its Expect, its note or its logcheck text), joined with a space. So does an unindented line right after the check with no blank line between (Markdown's lazy continuation), unless it starts a new bullet. An indented `key:` with an unknown key is a warning, and the line is kept as step text.
 7. **Ids.** By default a check's id is `<group>.<position>` (1-based, counting checks in that group). A pinned `id:` overrides it. Ids must be unique; a duplicate is an error. Later default ids don't move when an earlier check is pinned.
 8. **Smoke test.** If any check has `smoke: yes`, the page shows those checks first, in file order, in a "Smoke test" box, and the rest fold into "Deep checks (optional)". A smoke list of more than 12 checks is a warning.
 9. **Inline Markdown** allowed in the intro, group intros, steps, Expect and notes: `` `code` ``, `**bold**`, `*italic*`, `[text](https://...)` (http and https links only). Everything else is shown as literal text. Raw HTML is never passed through: `<` and `&` are escaped.
 10. **Comments.** Text inside `<!-- ... -->` is ignored, also across lines. A comment that never closes hides the rest of the file and gives an `unclosed-comment` warning.
 11. **Copy buttons.** A `` `code` `` span whose whole text is a console or PowerShell command (the `COMMAND_PATTERN` in `sftestplan/model.py`) gets a Copy button on the page.
+12. **Log checks.** A `## Log checks` heading (case-insensitive) holds checks that someone checks in the logs after play, not on the page. They use the usual `- [ ]` lines with `Expect:`, `log:`, `note:`, `logcheck:` and `id:`, and text before the first one is the section's introduction. The page shows them as a table "Checks in the logs" with no Pass/Fail control, and they never count in the tally, the export or the results row. Their ids are `L.1`, `L.2`, ... in file order; a pinned `id:` may be `L.<n>` or any `<g>.<n>` that no other check uses (so a converted plan keeps its old numbers). `smoke: yes` there is an error (`smoke-log-check`), and a Log checks section with no checks is an `empty-group` warning. A plan still needs at least one ordinary check.
+13. **Check in the log.** `logcheck: <text>` on an ordinary check shows a muted line "Check in the log: <text>" under the step. Use it when part of a check is proved by the log and someone must read the log for it; `log:` ids are for lines `sf-test-plan logs` can check by itself.
+14. **New Game+.** A `## New Game+` heading (also `## NG+`, case-insensitive) holds the mod's own New Game+ checks, in the usual `- [ ]` syntax with `Expect:`, `log:`, `note:` and `logcheck:`; text before the first one is the section's introduction. They are left off the mod's page. When the header has `ngplus:`, the page shows a line "New Game+ checks for this mod are on the shared New Game+ page" with that link. An `id:` there is an error (`bad-id`), because `sf-test-plan ngplus` numbers the checks in the shared plan; `smoke:` there is a warning and is ignored. An empty section is fine: it means the shared crossing checks cover the mod. `sf-test-plan ngplus --base <base plan> --order <order.json> --out <shared plan> [--force] <plan> ...` writes one shared plan: the base plan's title, `run:`, Before you start and groups first (with their numbers, ids and smoke checks), then one group per mod that has New Game+ checks, titled with the mod's `mod:` name and starting "Skip this group if the mod isn't installed.", then the base's Log checks. Its introduction gains "This page covers N mods." The order file is a JSON list of mod names: a mod's group number is the base's highest group number plus its 1-based place in the list, new mods are added at the end (the file is created if missing, and written only when it changes), and a mod that left keeps its place, so saved marks never move. Exit codes: 0 written; 1 a plan has errors (nothing is written); 2 bad input, such as a plan with no `mod:`, one mod given twice, a bad order file, an `--out` that is one of the inputs or that exists without `--force`, a read-only `--out` or a symbolic link. `--help` exits 0. Then run `sf-test-plan build` on the shared plan.
 
 ### Problems `check` reports
 
@@ -67,18 +72,24 @@ Each problem has a level (`error` or `warning`), the file, the line number, and 
 | `no-title` | error | no `# ` line |
 | `no-run` | error | no `run:` key |
 | `bad-run` | error | `run` has characters outside the allowed set or is too long |
-| `group-no-number` | error | a `## ` heading other than Before you start has no number |
+| `group-no-number` | error | a `## ` heading other than Before you start, Log checks and New Game+ has no number |
 | `dup-group` | error | two groups share a number |
 | `dup-id` | error | two checks share an id |
-| `bad-id` | error | a pinned id isn't `<g>.<n>` or its group part doesn't match |
-| `orphan-key` | error | an indented `Expect:`/`smoke:`/`log:`/`note:`/`id:` line with no check above it |
+| `bad-id` | error | a pinned id isn't `<g>.<n>` or its group part doesn't match, or a New Game+ check has `id:` |
+| `bad-ngplus` | error | the `ngplus:` header value isn't an http(s) address or a relative path |
+| `orphan-key` | error | an indented `Expect:`/`smoke:`/`log:`/`logcheck:`/`note:`/`id:` line with no check above it |
 | `no-checks` | error | the plan has no checks |
 | `check-outside-group` | error | a `- [ ]` line before the first group or under Before you start |
-| `empty-group` | warning | a group has no checks |
-| `unknown-key` | warning | an unknown header key or check key |
+| `empty-group` | warning | a group, or the Log checks section, has no checks |
+| `smoke-log-check` | error | a check under Log checks has `smoke: yes` |
+| `unknown-key` | warning | an unknown header key or check key, or `smoke:` on a New Game+ check |
 | `big-smoke` | warning | more than 12 smoke checks |
 | `unclosed-comment` | warning | a `<!--` with no `-->` after it |
 | `unknown-log-id` | error | (only with `--rules`) a `log:` id not in the rule file's `expect` or `forbid` ids |
+| `style-smoke` | style file's `level` | (only with `--style`) the number of smoke checks is outside the style file's `smoke` `min` and `max` |
+| `style-date` | style file's `level` | (only with `--style` and `iso_dates`) a date isn't written as YYYY-MM-DD |
+| `style-sentence` | style file's `level` | (only with `--style` and `full_sentences`) a step, Expect, note, logcheck, setup item or introduction paragraph isn't a full sentence |
+| `style-banned` | style file's `level` | (only with `--style`) a word or phrase on the style file's `banned` list |
 
 Exit codes for `check` and `build`: 0 = no errors (warnings allowed), 1 = errors, 2 = the file can't be read or the options are wrong.
 
@@ -91,6 +102,21 @@ Exit codes for `check` and `build`: 0 = no errors (warnings allowed), 1 = errors
 - `<span id="saved" class="saved"></span>` for the save status, the tally bar `<div class="bar" id="tally" data-total="N">`, and the toolbar `<div class="tools" id="tools">` holding `button`s with `data-act="export|import|copy|reset"` and a hidden `<input type="file" id="importfile" accept=".json,application/json">`.
 - Smoke checks inside `<section id="smoke">`, the rest inside `<details id="deep">` when smoke is set; otherwise groups are `<section class="group" id="g<n>">`.
 - `<code class="cmd">` on spans that match the command pattern (the script adds the Copy button).
+- The Log checks (rule 12) as `<section class="ref" id="log-checks">` holding a table with one `<tr data-id="L.1">` per check (columns #, What, Expected), and a check's `logcheck:` line (rule 13) as `<div class="bylog logcheck">Check in the log: ...</div>`.
+- `<script type="application/json" id="tp-logchecks">[...]</script>`, always present (an empty list when there is nothing): one object per Log check, `{"id", "kind": "log only", "what", "expect", "log"}`, then one per ordinary check with a `logcheck:` line, `{"id", "kind": "in-game", "what": <the logcheck text>, "expect", "log", "step"}`. Text fields are plain text (no HTML or Markdown marks), `log` is the list of `log:` ids. A log reviewer reads this instead of the HTML.
+- With `build --rules FILE`, a `<section class="ref" id="log-lines">` table "What the log lines mean": one row per `expect` and `forbid` rule of the rule file, with its `id`, its `re` as code, "Expected" or "Must not appear", and its `means`.
+
+### Embedding the page in another page (`render --fragment`)
+
+`render <plan>` writes the same full page as `build`, to `--out` or to stdout (the check report then goes to stderr). With `--fragment` it writes only `<div class="sf-test-plan" data-run="<run>">`, which holds the intro and facts in `<section class="tp-intro">` (no `<h1>`: the host page has its own heading), the topbar, Before you start, the smoke box, the deep checks or the groups, the log-checks table, the log-lines table, the Results log, and the `tp-config` and `tp-logchecks` JSON. It has no `<style>`, no inline script, no footer and no "done" box. Its `tp-config` is the same as the full page's (`plan` included), so marks saved on one are found on the other.
+
+`--assets DIR` also writes `sf-test-plan.js` (the page script) and `sf-test-plan.css` (the page's style sheet, which the host may use or replace) into DIR. A file there with the same bytes is left alone; one with other bytes is replaced only with `--force`.
+
+A host page must:
+
+- hold one fragment only (its ids, such as `#tally` and `#smoke`, are fixed);
+- load `<script src="sf-test-plan.js"></script>` after the fragment, because the script reads the page when it runs (this works on a page whose content security policy allows no inline scripts);
+- have `<meta name="viewport" content="width=device-width, initial-scale=1">` if it should fit a phone screen.
 
 The page saves marks in `localStorage` under `sf-test-plan:<run>:<plan>`, where `<plan>` is the `plan` value in tp-config: the first 12 hex digits of the SHA-256 of `<folder>/<file>` (the plan's own folder name and file name, lower case), `mod` (case and extra spaces ignored) and `run`, joined with newlines. Browsers share one storage area for every `file://` page, so this keeps two plans with the same `run` apart, while rebuilds of one plan in its folder share marks; editing the title keeps them, and moving or renaming the plan file starts empty (Export first). Marks are keyed by step id. Stored marks for ids the page doesn't have (from another build) are kept as they are, so two builds open at once never erase each other's marks; Reset clears only the page's own steps and says how many other marks it kept. **When a new build changes its steps, give it a new `run:`**, so its marks start fresh and no old mark sits on a renumbered step. If storage throws, the page keeps marks in memory and says so in `#saved`. When another tab of the same page saves (or the browser's site data is cleared), this page takes that save, so marks, clears and Reset carry over; only a note typed here that wasn't saved yet is laid on top of it.
 
@@ -143,6 +169,8 @@ Written next to the plan by `import`. Newest round first. `build` shows it as th
 - otherwise the check gets no entry in the marks file (an empty entry could replace a tester's mark), and the command's printed lines say which rule wasn't seen.
 Marks it writes have `src: "log"`.
 
+A Log check (rule 12) with `log:` ids gets one printed line, `<id> log check PASS|FAIL|NOT SEEN: <each rule and its status>.` (FAIL when any listed rule failed, PASS when all passed, otherwise NOT SEEN), but never an entry in the marks file, since the page has no control for it. `rules` (section 6) also counts the `log:` ids of Log checks.
+
 ## 6. Starter rule file (`rules`)
 
 `sf-test-plan rules` writes a papyrus-log-check rule file (the format is in papyrus-log-check's README). It reads only the plan and, with `--from`, an existing rule file.
@@ -154,3 +182,22 @@ Marks it writes have `src: "log"`.
 - `--plugin` can't be used with `--from` (exit 2): the file's own `plugins` list is kept, so edit it there.
 - The output has one top-level field per line and one rule per line. It is UTF-8 with LF line ends.
 - The default output is the `--from` file, or else the plan's path with `.testplan.md` (or `.md`) replaced by `.logrules.json`. An existing file is replaced only with `--force`, and the plan itself is never an output. The file is written to a temporary file in the same folder and then moved into place, so a failed write leaves the old file as it was. A replaced file gets its old permission bits back after the move. The output file itself must not be a symbolic link, a read-only file or anything other than a regular file: when something would be written and the output path is one of those (a link even when it points nowhere), the command refuses with exit 2, names where the path came from (`--out`, `--from` or the default name), and asks for another name with `--out`. Only the file is checked, not the folders above it. Text that can't be saved as UTF-8 (such as a lone `\ud800` escape in the `--from` file) is an error that says where it can come from (the `--from` file, else `--prefix` or the plan), checked before anything is printed (exit 2). The ids and patterns it prints are ASCII (other characters are shown as JSON escapes such as `\u00e9`), while the file itself keeps them as UTF-8. File paths are printed as they are. Output is always UTF-8, whatever the console's code page, and a path character that isn't valid Unicode prints as `?`, while the `--log` file writes it with escapes such as `\udcff`. When the mod name comes from such a file name, those characters are left out of it. A refused run (the output is a link, read-only or not a regular file, or it already exists without `--force`) prints only its error, on stderr, and nothing on stdout. When no id is missing and the prefix doesn't change, or the plan has no `log:` ids, nothing is written and the exit code is 0.
+
+## 7. Style rules file (`--style`)
+
+`sf-test-plan check <plan> --style <file>` and `sf-test-plan build <plan> --style <file>` also check the plan against a project's own writing rules. The file is JSON (UTF-8):
+
+```json
+{"format": "sf-test-plan-style/1", "level": "error", "smoke": {"min": 3, "max": 12}, "iso_dates": true,
+ "full_sentences": true, "banned": ["obviously", {"word": "just", "use": "nothing (leave it out)"}]}
+```
+
+- `format` is required and must be `sf-test-plan-style/1`. Every other key is optional, and a rule that is left out isn't checked.
+- `level` (`error` or `warning`, default `error`) is the level of every style problem. Style errors make `check` exit 1 and stop `build` like other errors; warnings don't.
+- `smoke`: the number of `smoke: yes` checks must be at least `min` and at most `max` (either may be left out). Code `style-smoke`, reported for the whole file. The fixed `big-smoke` warning (more than 12) still applies too.
+- `iso_dates: true`: a date written another way (`11/23/2026`, `2026/11/23`, `23.11.2026`, `Nov 23, 2026`, `November 23 2026`, `23 November 2026`) is `style-date`, and the message gives the YYYY-MM-DD form. A slash date is read month first unless the first number is over 12.
+- `full_sentences: true`: each step, note and Before you start item, and each paragraph of the plan's, a group's, the Log checks' or the New Game+ introduction, must start with a capital letter, a digit, a quote or a code span (after any leading `**`, `*`, `_` or `[`), and end with `.`, `!`, `?` or `:` (a closing `)`, `]`, quote, `**`, `*` or `_` after it is fine). `Expect:` and `logcheck:` text follows a label on the page, so it may start in lower case, but it must still end that way. Titles are exempt, and an introduction paragraph that is a list, table, quote or code block is skipped. Code `style-sentence`.
+- `banned`: a list of words or phrases, each a string or `{"word": "...", "use": "what to write instead"}`. A match is whole-word and case-insensitive, and the words of a phrase match with any spacing between them. Code `style-banned`; the message gives `use` when it is set.
+- Dates and banned words are looked for in every line except the data key lines (`run:`, `mod:`, `version:`, `zip:`, `ngplus:`, `smoke:`, `log:`, `id:`) and comments; text in `` `code` `` spans, link targets and `<https://...>` links is skipped. The rules cover ordinary checks, Log checks and New Game+ checks alike, while `smoke` counts only the checks on the page.
+- An unknown key (also inside `smoke` or a `banned` object), a value of the wrong type, `min` more than `max`, a negative count, an empty banned word, a bad `format`, or a file that isn't JSON is exit 2, with a message naming the key. `build` also refuses an `--out` that is the style file.
+- `examples/style.json` is a made-up example; `examples/Beacon.testplan.md` passes it.

@@ -148,6 +148,15 @@ try {
   const smokeIds = await ev(`[...document.querySelectorAll('#smoke li.check')].map(li=>li.getAttribute('data-id'))`);
   const deepIds = await ev(`[...document.querySelectorAll('#deep li.check')].map(li=>li.getAttribute('data-id'))`);
   check('every check has Pass/Fail/Skip and a note box', await ev(`[...document.querySelectorAll('li.check')].every(li=>li.querySelectorAll('.seg[role=radiogroup] input[type=radio]').length===3 && li.querySelectorAll('.seg label').length===3 && !!li.querySelector('.note textarea[aria-label]'))`));
+  // 0.4.0 Log checks: a table with no controls, kept out of the tally, listed in the tp-logchecks JSON
+  const logItems = await ev(`(()=>{const s=document.getElementById('tp-logchecks'); return s ? JSON.parse(s.textContent) : null})()`);
+  check('the page has a tp-logchecks JSON list', Array.isArray(logItems), JSON.stringify(logItems));
+  if (await ev(`!!document.getElementById('log-checks')`)) {
+    check('the Log checks table has no Pass/Fail control or note box', await ev(`(()=>{const s=document.getElementById('log-checks'); return s.querySelectorAll('input,textarea,li.check').length===0 && s.querySelectorAll('tbody tr').length>0})()`));
+    const rowIds = await ev(`[...document.querySelectorAll('#log-checks tbody tr')].map(tr=>tr.getAttribute('data-id'))`);
+    check('Log check ids are in tp-logchecks as "log only" and are not page checks', rowIds.every((id) => !ids.includes(id) && logItems.some((x) => x.id === id && x.kind === 'log only')), JSON.stringify(rowIds));
+    check('the tally total leaves the Log checks out', (await ev(`+document.getElementById('tally').getAttribute('data-total')`)) === (hasSmoke ? smokeIds.length : ids.length));
+  }
   const open0 = await openN();
   check('"not run" counts only smoke checks when there is a smoke test', hasSmoke ? open0 === smokeIds.length : open0 === ids.length, `open ${open0}, smoke ${smokeIds.length}, all ${ids.length}`);
   check('the save line says marks save in this browser', /saved in this browser/i.test(await ev(`document.getElementById('saved').textContent`)));

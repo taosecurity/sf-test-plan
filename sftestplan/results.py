@@ -275,8 +275,11 @@ def logs_to_marks(plan: Plan, report: dict, mod: str | None, now: str) -> tuple[
             rules.setdefault(str(r["id"]), r)
 
     log_checks = [c for c in plan.checks() if c.log]
-    if not log_checks:
+    log_only = [c for c in plan.log_checks if c.log]
+    if not log_checks and not log_only:
         lines.append("The plan has no checks with log: ids, so there is nothing to mark.")
+    elif not log_checks:
+        lines.append("No page check has log: ids, so no marks were written. The Log checks are below.")
     for c in log_checks:
         found = [rid for rid in c.log if rid in rules]
         missing = [rid for rid in c.log if rid not in rules]
@@ -311,6 +314,18 @@ def logs_to_marks(plan: Plan, report: dict, mod: str | None, now: str) -> tuple[
             lines.append(f"  {c.id}: rule {rid!r} isn't in the report for {name}. Check the id against the rule "
                          f"file, and that papyrus-log-check used the current rule file.")
         log.debug("check %s: %s (%s)", c.id, res or "no mark", note)
+    # Log checks have no control on the page, so they get a line each but never a mark (FORMAT.md 5).
+    for c in log_only:
+        sts = {rid: str(rules[rid].get("status", "")) if rid in rules else "" for rid in c.log}
+        if any(s == "FAIL" for s in sts.values()):
+            verdict = "FAIL"
+        elif all(s == "PASS" for s in sts.values()):
+            verdict = "PASS"
+        else:
+            verdict = "NOT SEEN"
+        bits = [f"{rid} {s}" if s else f"{rid} isn't in the report" for rid, s in sts.items()]
+        lines.append(f"{c.id} log check {verdict}: {'; '.join(bits)}.")
+        log.debug("log check %s: %s", c.id, verdict)
     return marks, lines
 
 

@@ -8,9 +8,11 @@ import json
 import logging
 import os
 import re
+import urllib.parse
 
 from . import model
 from .model import Check, Group, Plan, SetupError
+from .results import plain_text
 
 log = logging.getLogger("sf-test-plan")
 
@@ -79,6 +81,19 @@ def _asset(name: str, required: bool) -> str:
     return text
 
 
+HOST_ASSETS = (("sf-test-plan.js", "page.js"), ("sf-test-plan.css", "page.css"))
+
+
+def asset_bytes(name: str) -> bytes:
+    """An asset file's exact bytes (render --assets copies them for a host page)."""
+    path = os.path.join(ASSETS, name)
+    try:
+        with open(path, "rb") as f:
+            return f.read()
+    except OSError as e:
+        raise SetupError(f"can't read {path}: {e.strerror}. Reinstall sf-test-plan: the assets folder is part of it.")
+
+
 def _json_for_script(obj) -> str:
     """JSON that can sit inside <script> safely: no </script>, <!-- or & sequences survive."""
     return (json.dumps(obj, ensure_ascii=False)
@@ -99,6 +114,8 @@ def _check_li(c: Check, groups: dict[int, Group], show_from: bool, intro: str = 
     if c.log:
         ids = " ".join(f"<code>{esc(x)}</code>" for x in c.log)
         parts.append(f'<div class="bylog">Also checked from the Papyrus log: {ids}</div>')
+    if c.logcheck:
+        parts.append(f'<div class="bylog logcheck">Check in the log: {inline(c.logcheck)}</div>')
     if show_from:
         g = groups.get(c.group)
         title = f": {esc(g.title)}" if g and g.title else ""
@@ -134,15 +151,82 @@ def _results_section(rows: list[dict]) -> list[str]:
     return out
 
 
+def _log_checks_section(plan: Plan) -> list[str]:
+    """The Log checks table (FORMAT.md rule 12): no Pass/Fail control, not in the tally."""
+    out = ['<section class="ref" id="log-checks">', "  <h2>Checks in the logs</h2>"]
+    out += ["  " + p for p in _paras(plan.log_intro)]
+    out += ['  <p class="muted">Check these in the logs after you play. They aren\'t marked on this page and '
+            "don't count in the tally.</p>",
+            '  <div class="tbl"><table>',
+            "    <thead><tr><th>#</th><th>What</th><th>Expected</th></tr></thead>",
+            "    <tbody>"]
+    for c in plan.log_checks:
+        what = [inline(c.step)]
+        if c.note:
+            what.append(f'<div class="hint">{inline(c.note)}</div>')
+        if c.logcheck:
+            what.append(f'<div class="bylog logcheck">Check in the log: {inline(c.logcheck)}</div>')
+        if c.log:
+            ids = " ".join(f"<code>{esc(x)}</code>" for x in c.log)
+            what.append(f'<div class="bylog">Log rules: {ids}</div>')
+        out.append(f'      <tr data-id="{esc(c.id)}"><td>{esc(c.id)}</td><td>{"".join(what)}</td>'
+                   f"<td>{inline(c.expect)}</td></tr>")
+    out += ["    </tbody>", "  </table></div>", "</section>"]
+    return out
+
+
+def _log_lines_section(rule_file: dict) -> list[str]:
+    """'What the log lines mean' from a papyrus-log-check rule file's expect and forbid rules."""
+    rows = []
+    for kind, label in (("expect", "Expected"), ("forbid", "Must not appear")):
+        for r in rule_file.get(kind) or []:
+            if not isinstance(r, dict):
+                continue
+            rid, rx, means = (r.get(k) if isinstance(r.get(k), str) else "" for k in ("id", "re", "means"))
+            pattern = f"<code>{esc(rx)}</code>" if rx else ""
+            rows.append(f"      <tr><td>{esc(rid)}</td><td>{pattern}</td><td>{label}</td><td>{esc(means)}</td></tr>")
+    if not rows:
+        return []
+    return (['<section class="ref" id="log-lines">', "  <h2>What the log lines mean</h2>",
+             '  <p class="muted">The Papyrus log lines this mod writes, from its papyrus-log-check rule file.</p>',
+             '  <div class="tbl"><table>',
+             "    <thead><tr><th>Rule</th><th>Log line</th><th>Kind</th><th>What it means</th></tr></thead>",
+             "    <tbody>"] + rows + ["    </tbody>", "  </table></div>", "</section>"])
+
+
+def log_items(plan: Plan) -> list[dict]:
+    """The tp-logchecks JSON (FORMAT.md section 2): every Log check ("log only") and every page check with a
+    logcheck: line ("in-game"), in plain text, so a log reviewer can read them without parsing HTML."""
+    items = [{"id": c.id, "kind": "log only", "what": plain_text(c.step, None), "expect": plain_text(c.expect, None),
+              "log": list(c.log)} for c in plan.log_checks]
+    items += [{"id": c.id, "kind": "in-game", "what": plain_text(c.logcheck, None),
+               "expect": plain_text(c.expect, None), "log": list(c.log), "step": plain_text(c.step, None)}
+              for c in plan.checks() if c.logcheck]
+    return items
+
+
+def ngplus_href(value: str) -> str:
+    """The href for an ngplus: value the parser accepted (parse.ngplus_link_ok): an http(s) address as it is; a
+    relative path with forward slashes and its spaces and other unsafe characters percent-encoded."""
+    v = value.strip()
+    if re.match(r"^https?://", v, re.I):
+        return v
+    return urllib.parse.quote(v.replace("\\", "/"), safe="/#?&=%+@!$,;~._-")
+
+
 def _safe_inline_code(text: str, tag: str) -> str:
     """Our own CSS or script, made safe to inline: it can't close its element early."""
     return re.sub(rf"</({tag})", r"<\\/\1", text, flags=re.I)
 
 
-def render(plan: Plan, results: list[dict] | None = None) -> str:
-    """The whole page as one HTML string (no network loads). results: rows from a results file, newest first."""
-    css = _asset("page.css", required=True)
-    js = _asset("page.js", required=False)
+def render(plan: Plan, results: list[dict] | None = None, rule_file: dict | None = None,
+           fragment: bool = False) -> str:
+    """The whole page as one HTML string (no network loads). results: rows from a results file, newest first.
+    rule_file: a papyrus-log-check rule file object (--rules), shown as the "What the log lines mean" table.
+    fragment: only the <div class="sf-test-plan"> a host page embeds (FORMAT.md section 2): no <h1>, <style>,
+    inline script or footer; the host loads sf-test-plan.js after it."""
+    css = "" if fragment else _asset("page.css", required=True)
+    js = "" if fragment else _asset("page.js", required=False)
     title = plan.title or "Test plan"
     groups = {g.number: g for g in plan.groups}
     checks = plan.checks()
@@ -165,12 +249,15 @@ def render(plan: Plan, results: list[dict] | None = None) -> str:
     config = {"format": model.PAGE_FORMAT, "run": plan.run, "title": title, "tool": model.TOOL_ID,
               "mod": plan.mod, "version": plan.version, "zip": plan.zip, "total": total, "plan": plan_id}
 
-    out = ["<!doctype html>", '<html lang="en">', "<head>", '<meta charset="utf-8">',
-           '<meta name="viewport" content="width=device-width, initial-scale=1">',
-           f"<title>{esc(title)}</title>",
-           f'<meta name="generator" content="{esc(model.TOOL_ID)}">',
-           "<style>", _safe_inline_code(css, "style"), "</style>", "</head>", "<body>", '<div class="wrap">',
-           "<header>", '  <div class="eyebrow">Test plan</div>', f"  <h1>{esc(title)}</h1>"]
+    if fragment:
+        out = [f'<div class="sf-test-plan" data-run="{esc(plan.run)}">', '<section class="tp-intro">']
+    else:
+        out = ["<!doctype html>", '<html lang="en">', "<head>", '<meta charset="utf-8">',
+               '<meta name="viewport" content="width=device-width, initial-scale=1">',
+               f"<title>{esc(title)}</title>",
+               f'<meta name="generator" content="{esc(model.TOOL_ID)}">',
+               "<style>", _safe_inline_code(css, "style"), "</style>", "</head>", "<body>", '<div class="wrap">',
+               "<header>", '  <div class="eyebrow">Test plan</div>', f"  <h1>{esc(title)}</h1>"]
     out += ["  " + p for p in _paras(plan.intro)]
     facts = [("Mod", plan.mod), ("Version", plan.version), ("Zip", plan.zip), ("Run", plan.run)]
     out.append('  <dl class="facts">')
@@ -182,6 +269,9 @@ def render(plan: Plan, results: list[dict] | None = None) -> str:
         how = ("<strong>Smoke test first.</strong> The checks in the Smoke test box are the core ones. "
                "The deep checks are optional: open them before a public release, or when something looks wrong. " + how)
     out.append(f'  <p class="muted how">{how}</p>')
+    if plan.ngplus:
+        out.append(f'  <p class="ngplus" id="ngplus-link">New Game+ checks for this mod are on the '
+                   f'<a href="{esc(ngplus_href(plan.ngplus))}">shared New Game+ page</a>.</p>')
     toc = []
     if plan.setup:
         toc.append(("prep", "Before you start"))
@@ -191,12 +281,17 @@ def render(plan: Plan, results: list[dict] | None = None) -> str:
             toc.append(("deep", "Deep checks"))
     else:
         toc += [(f"g{g.number}", f"{g.number} {g.title}".strip()) for g in plan.groups if g.checks]
+    log_lines = _log_lines_section(rule_file) if rule_file else []
+    if plan.log_checks:
+        toc.append(("log-checks", "Checks in the logs"))
+    if log_lines:
+        toc.append(("log-lines", "What the log lines mean"))
     if rows:
         toc.append(("results", "Results log"))
     if toc:
         out.append('  <nav class="toc" aria-label="On this page">'
                    + "".join(f'<a href="#{a}">{esc(t)}</a>' for a, t in toc) + "</nav>")
-    out.append("</header>")
+    out.append("</section>" if fragment else "</header>")
 
     out += ['<div class="topbar" role="region" aria-label="Results">',
             f'  <div class="bar" id="tally" data-total="{total}">'
@@ -248,16 +343,24 @@ def render(plan: Plan, results: list[dict] | None = None) -> str:
             if g.checks:
                 out += _group_section(g, g.checks, groups)
 
+    if plan.log_checks:
+        out += _log_checks_section(plan)
+    out += log_lines
     if rows:
         out += _results_section(rows)
 
+    data = [f'<script type="application/json" id="tp-config">{_json_for_script(config)}</script>',
+            f'<script type="application/json" id="tp-logchecks">{_json_for_script(log_items(plan))}</script>']
+    if fragment:
+        page = "\n".join(out + data + ["</div>", ""])
+        log.debug("rendered the fragment for %r: %d checks, %d characters", title, len(checks), len(page))
+        return page
     out += ["<footer>",
             f'  <p>Made with <a href="{esc(model.URL)}" rel="noopener">{esc(model.TOOL_ID)}</a>. '
             f"Marks are kept in this browser under the run <code>{esc(plan.run)}</code>; "
             "a new run starts with empty marks. If the line under the tally says saving isn't available, "
             "use <strong>Export</strong> before you close the page.</p>",
-            "</footer>", "</div>",
-            f'<script type="application/json" id="tp-config">{_json_for_script(config)}</script>',
+            "</footer>", "</div>"] + data + [
             "<script>", _safe_inline_code(js, "script"), "</script>", "</body>", "</html>", ""]
     page = "\n".join(out)
     log.debug("rendered %r: %d checks on the page (%d smoke), total %d, %d results rows, %d characters",

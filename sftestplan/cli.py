@@ -2,15 +2,18 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import datetime as _dt
 import json
 import logging
 import os
+import re
+import shlex
 import stat
 import sys
 import tempfile
 
-from . import model, parse, render, results, rules
+from . import builds, model, ngplus, parse, render, results, rules, style
 from .model import SetupError
 
 log = logging.getLogger("sf-test-plan")
@@ -57,38 +60,141 @@ def _rule_ids(args) -> set[str] | None:
     return parse.load_rule_ids(args.rules) if getattr(args, "rules", None) else None
 
 
+def _parse_with_style(args, rule_ids: set[str] | None) -> model.Plan:
+    """Parse the plan; with --style, also apply the style file's rules (a bad style file is exit 2 before parsing)."""
+    st = style.load_style(args.style) if getattr(args, "style", None) else None
+    text = parse._read_text(args.plan, "plan")
+    log.debug("read plan %s (%d characters)", args.plan, len(text))
+    plan = parse.parse_text(text, args.plan, rule_ids)
+    if st is not None:
+        style.apply(plan, text, st)
+    return plan
+
+
 def cmd_check(args) -> int:
-    plan = parse.parse_file(args.plan, _rule_ids(args))
+    plan = _parse_with_style(args, _rule_ids(args))
     return _report(plan)
 
 
-def cmd_build(args) -> int:
-    plan = parse.parse_file(args.plan, _rule_ids(args))
+def _load_for_page(args):
+    """Parse the plan (with --rules and --style) and report it. Returns (plan, rule_file, exit code)."""
+    rule_file = parse.load_rule_file(args.rules) if args.rules else None
+    plan = _parse_with_style(args, parse.rule_ids_of(rule_file, args.rules) if rule_file is not None else None)
     code = _report(plan)
     if code:
         print("No page written: fix the errors above first.")
-        return code
-    rows = results.load_results(args.plan)
-    out = args.out or _default_out(args.plan)
-    given = f"--out {out}" if args.out else f"The default page {out}"
+    return plan, rule_file, code
+
+
+def _refuse_input_as_output(args, out: str, given: str, fix: str) -> None:
+    """An output must never be the plan, its results file, the --rules file or the --style file."""
+    for other, what in ((args.plan, "the plan itself"), (results.results_path(args.plan), "the plan's results file"),
+                        (getattr(args, "rules", None), "the --rules file"),
+                        (getattr(args, "style", None), "the --style file")):
+        if other and _same_file(out, other):
+            raise SetupError(f"{given} is {what}. {fix}.")
+
+
+def _check_page_out(args, out: str, given: str) -> None:
     fix = "Give the page another name with --out"
-    if _same_file(out, args.plan):
-        raise SetupError(f"{given} is the plan itself. {fix}.")
-    if _same_file(out, results.results_path(args.plan)):
-        raise SetupError(f"{given} is the plan's results file. {fix}.")
-    if args.rules and _same_file(out, args.rules):
-        raise SetupError(f"{given} is the --rules file. {fix}.")
+    _refuse_input_as_output(args, out, given, fix)
     if os.path.isdir(out):
         raise SetupError(f"{out} is a folder, not a page file. Give a file name with --out, such as {out}{os.sep}page.html.")
     _refuse_unsafe_output(out, given, fix)
-    html = render.render(plan, rows)
+
+
+def _write_page(out: str, html: str) -> None:
     try:
         with open(out, "w", encoding="utf-8", newline="\n") as f:
             f.write(html)
     except OSError as e:
         raise SetupError(f"can't write {out}: {e.strerror}. Pick another --out.")
     log.debug("wrote %s (%d bytes)", out, len(html))
+
+
+def cmd_build(args) -> int:
+    plan, rule_file, code = _load_for_page(args)
+    if code:
+        return code
+    rows = results.load_results(args.plan)
+    out = args.out or _default_out(args.plan)
+    _check_page_out(args, out, f"--out {out}" if args.out else f"The default page {out}")
+    _write_page(out, render.render(plan, rows, rule_file))
     print(f"Page: {out}")
+    return 0
+
+
+def _plan_assets(args) -> list[tuple[str, bytes, bool]]:
+    """The --assets files to write: (path, bytes, already the same). All refusals come before anything is written."""
+    folder = args.assets
+    if os.path.lexists(folder) and not os.path.isdir(folder):
+        raise SetupError(f"--assets {folder} isn't a folder. Give a folder for sf-test-plan.js and sf-test-plan.css.")
+    todo = []
+    for name, source in render.HOST_ASSETS:
+        path = os.path.join(folder, name)
+        data = render.asset_bytes(source)
+        given, fix = f"--assets file {path}", "Give another folder with --assets"
+        _refuse_input_as_output(args, path, given, fix)
+        if args.out and _same_file(path, args.out):
+            raise SetupError(f"--out {args.out} is the {given}. Give the page another name with --out.")
+        if os.path.isdir(path):
+            raise SetupError(f"{given} is a folder, so nothing was written. {fix}.")
+        _refuse_unsafe_output(path, given, fix)
+        same = False
+        if os.path.lexists(path):
+            try:
+                with open(path, "rb") as f:
+                    same = f.read() == data
+            except OSError as e:
+                raise SetupError(f"can't read {path}: {e.strerror}. {fix}.")
+            if not same and not args.force:
+                raise SetupError(f"{path} already exists with other contents: add --force to replace it, or "
+                                 "give another folder with --assets. Nothing was written.")
+        todo.append((path, data, same))
+    return todo
+
+
+def cmd_render(args) -> int:
+    to_stdout = not args.out
+    if to_stdout:   # the report goes to stderr, so the page on stdout can be piped
+        with contextlib.redirect_stdout(sys.stderr):
+            plan, rule_file, code = _load_for_page(args)
+    else:
+        plan, rule_file, code = _load_for_page(args)
+    if code:
+        return code
+    rows = results.load_results(args.plan)
+    if args.out:
+        _check_page_out(args, args.out, f"--out {args.out}")
+    assets = _plan_assets(args) if args.assets else []
+    html = render.render(plan, rows, rule_file, fragment=args.fragment)
+    note = sys.stderr if to_stdout else sys.stdout
+    if assets:
+        try:
+            os.makedirs(args.assets, exist_ok=True)
+        except OSError as e:
+            raise SetupError(f"can't make the folder {args.assets}: {e.strerror}. Give another folder with --assets.")
+        for path, data, same in assets:
+            if same:
+                print(f"Unchanged: {path}", file=note)
+                continue
+            try:
+                with open(path, "wb") as f:
+                    f.write(data)
+            except OSError as e:
+                raise SetupError(f"can't write {path}: {e.strerror}. Give another folder with --assets.")
+            print(f"Wrote: {path}", file=note)
+    if to_stdout:   # bytes, so the page piped to a file is the same as --out's (no \r\n on Windows)
+        sys.stdout.flush()
+        buf = getattr(sys.stdout, "buffer", None)
+        if buf is not None:
+            buf.write(html.encode("utf-8", "replace"))
+            buf.flush()
+        else:
+            sys.stdout.write(html)
+    else:
+        _write_page(args.out, html)
+        print(f"{'Fragment' if args.fragment else 'Page'}: {args.out}")
     return 0
 
 
@@ -138,8 +244,21 @@ def cmd_logs(args) -> int:
             json.dump(marks, f, indent=1)
     except OSError as e:
         raise SetupError(f"can't write {out}: {e.strerror}. Pick another --out.")
-    print(f"Marks: {out} (open the page and use Import, or run: sf-test-plan import {out} --plan {args.plan})")
+    print(f"Marks: {out} (open the page and use Import, or run: sf-test-plan import {_q(out)} --plan {_q(args.plan)})")
     return 0
+
+
+_PLAIN_ARG = re.compile(r"^[A-Za-z0-9_./\\:+=@%,-]+$")
+
+
+def _q(path: str, windows: bool | None = None) -> str:
+    """path for a printed command line: as it is when it is plain, else quoted so it can be pasted as is (double
+    quotes on Windows, single quotes elsewhere)."""
+    if _PLAIN_ARG.match(path):
+        return path
+    if windows if windows is not None else os.name == "nt":
+        return '"' + path.replace('"', '\\"') + '"'
+    return shlex.quote(path)
 
 
 def _strip_plan_ending(name: str) -> str:
@@ -352,7 +471,7 @@ def cmd_rules(args) -> int:
     _write_atomic(out, text, "The old file, if any, is unchanged. Pick another --out, or check the folder is writable.")
     log.debug("wrote %s (%d bytes, %d new rules)", out, len(text), len(added))
     print(f"Rule file: {out}. Edit each new 're' to match the line your mod writes, and move a rule for a line "
-          f"that must never appear to 'forbid'. Then run: sf-test-plan check {args.plan} --rules {out}")
+          f"that must never appear to 'forbid'. Then run: sf-test-plan check {_q(args.plan)} --rules {_q(out)}")
     return 0
 
 
@@ -379,7 +498,103 @@ def cmd_new(args) -> int:
             f.write(text)
     except OSError as e:
         raise SetupError(f"can't write {args.plan}: {e.strerror}. Check that the folder exists, that you can write to it and that the file isn't read-only, or pick another name.")
-    print(f"Starter plan: {args.plan}. Edit it, then run: sf-test-plan build {args.plan}")
+    print(f"Starter plan: {args.plan}. Edit it, then run: sf-test-plan build {_q(args.plan)}")
+    return 0
+
+
+def _print_compare(result: dict, as_json: bool) -> int:
+    if as_json:
+        print(builds.as_json(result))
+    else:
+        builds.print_report(result)
+    return 0 if result["same"] else 1
+
+
+def cmd_compare_builds(args) -> int:
+    result = builds.compare(args.tested, args.built, builds.load_pins(args.pins))
+    return _print_compare(result, args.json)
+
+
+def cmd_check_build(args) -> int:
+    pins = builds.load_pins(args.pins)
+    if args.tested:
+        tested = args.tested
+    else:
+        if not os.path.isfile(args.plan):
+            raise SetupError(f"the plan {args.plan} doesn't exist. Give the path to a .testplan.md file.")
+        tested = builds.tested_zip_from_plan(args.plan, parse.parse_file(args.plan).zip)
+    log.debug("check-build: tested %s, built %s", tested, args.built)
+    result = builds.compare(tested, args.built, pins)
+    if args.json:
+        return _print_compare(result, True)
+    for w in result["warnings"]:
+        print(f"WARNING: {w} The tested zip is {tested}, and the built zip is {args.built}.")
+    if not result["same"]:
+        print(f"The tested zip is not the current build. The tested zip is {tested}, and the built zip is "
+              f"{args.built}. " + " ".join(result["problems"]) +
+              " Rebuild the test zip from the current build, or give the plan a new run: and zip:.")
+        return 1
+    print("OK: the built zip has the same plugins as the tested zip.")
+    return 0
+
+
+def cmd_ngplus(args) -> int:
+    inputs = [(args.base, "the --base plan")] + [(p, f"the plan {p}") for p in args.plans]
+    fix = "Give the shared plan another name with --out"
+    for path, what in inputs + [(args.order, "the --order file")]:
+        if _same_file(args.out, path):
+            raise SetupError(f"--out {args.out} is {what}. {fix}.")
+    for path, what in inputs:
+        if _same_file(args.order, path):
+            raise SetupError(f"--order {args.order} is {what}. Give the order file its own name, such as "
+                             "ngplus-order.json.")
+    for path, opt in ((args.out, "--out"), (args.order, "--order")):
+        if os.path.isdir(path):
+            raise SetupError(f"{opt} {path} is a folder, not a file. Give a file name, such as "
+                             f"{path}{os.sep}{'NewGamePlus.testplan.md' if opt == '--out' else 'ngplus-order.json'}.")
+    _refuse_unsafe_output(args.out, f"--out {args.out}", fix)
+    if os.path.lexists(args.out) and not args.force:
+        raise SetupError(f"{args.out} already exists: pick another --out, or add --force to replace it.")
+    order = ngplus.load_order(args.order)
+    base = parse.parse_file(args.base)
+    plans = [parse.parse_file(p) for p in args.plans]
+    bad = [p for p in [base] + plans if p.errors()]
+    if bad:
+        for p in bad:
+            _report(p)
+        print("Nothing written: fix the errors above first.")
+        return 1
+    seen: dict[str, str] = {}
+    for p in plans:
+        name = ngplus.mod_name(p)
+        if not name:
+            raise SetupError(f"the plan {p.path} has no 'mod:' line, so its New Game+ group has no name. Add "
+                             "'mod: <the mod's name>' under its title.")
+        if name in seen:
+            raise SetupError(f"the mod {json.dumps(name)} is in both {seen[name]} and {p.path}. Give each mod once.")
+        seen[name] = p.path
+    text, new_order, summary = ngplus.shared_plan(base, plans, order)
+    check = parse.parse_text(text, args.out)
+    if check.errors():   # the shared plan is made from plans with no errors, so this is a bug in sf-test-plan
+        raise RuntimeError("the shared plan it made has errors: " + "; ".join(e.message for e in check.errors()))
+    if new_order != order:
+        _refuse_unsafe_output(args.order, f"--order {args.order}",
+                              "Give the order file another name with --order")
+        _write_atomic(args.order, json.dumps(new_order, indent=1, ensure_ascii=False) + "\n",
+                      "Nothing was written. Pick another --order, or check the folder is writable.")
+        added = [m for m in new_order if m not in order]
+        print(f"Order file: {args.order} (added {', '.join(added)})")
+    else:
+        print(f"Order file: {args.order} (unchanged)")
+    for name, num, n in summary:
+        if n:
+            print(f"Group {num}: {name} ({_count(n, 'check')})")
+        else:
+            print(f"{name}: no New Game+ checks of its own (the shared checks cover it)")
+    _write_atomic(args.out, text, "The order file was updated, but the shared plan wasn't written. Pick another "
+                                  "--out, or check the folder is writable.")
+    log.debug("wrote %s (%d bytes, %d mods)", args.out, len(text), len(plans))
+    print(f"Shared plan: {args.out} ({_count(len(plans), 'mod')}). Then run: sf-test-plan build {_q(args.out)}")
     return 0
 
 
@@ -394,12 +609,29 @@ def build_parser() -> argparse.ArgumentParser:
     b = sub.add_parser("build", parents=[common], help="write the checklist page")
     b.add_argument("plan")
     b.add_argument("--out", metavar="FILE", help="page path (default: the plan's name with .html)")
-    b.add_argument("--rules", metavar="FILE", help="papyrus-log-check rule file: check the log: ids against it")
+    b.add_argument("--rules", metavar="FILE", help="papyrus-log-check rule file: check the log: ids against it, and "
+                                                   "add a table of what its log lines mean to the page")
+    style_help = f"style rules file (format {style.STYLE_FORMAT}): also check smoke count, dates, sentences and banned words"
+    b.add_argument("--style", metavar="FILE", help=style_help + "; style errors stop the build")
     b.set_defaults(func=cmd_build)
+
+    rd = sub.add_parser("render", parents=[common],
+                        help="write the page, or with --fragment only the part a host page embeds, to --out or stdout")
+    rd.add_argument("plan")
+    rd.add_argument("--fragment", action="store_true",
+                    help="write only <div class=\"sf-test-plan\">: no <h1>, styles, inline script or footer (the host "
+                         "page loads sf-test-plan.js after it)")
+    rd.add_argument("--out", metavar="FILE", help="file to write (default: print to stdout; the report goes to stderr)")
+    rd.add_argument("--assets", metavar="DIR", help="also write sf-test-plan.js and sf-test-plan.css into DIR for a host page")
+    rd.add_argument("--rules", metavar="FILE", help="papyrus-log-check rule file, as for build")
+    rd.add_argument("--style", metavar="FILE", help=style_help + "; style errors stop it")
+    rd.add_argument("--force", action="store_true", help="replace --assets files that have other contents")
+    rd.set_defaults(func=cmd_render)
 
     c = sub.add_parser("check", parents=[common], help="check the plan for mistakes, without writing a page")
     c.add_argument("plan")
     c.add_argument("--rules", metavar="FILE", help="papyrus-log-check rule file: check the log: ids against it")
+    c.add_argument("--style", metavar="FILE", help=style_help)
     c.set_defaults(func=cmd_check)
 
     i = sub.add_parser("import", parents=[common], help="add a marks file from the page to the plan's results file")
@@ -435,6 +667,38 @@ def build_parser() -> argparse.ArgumentParser:
     n.add_argument("--mod", help="the mod's name (default: from the file name)")
     n.add_argument("--force", action="store_true", help="replace an existing file")
     n.set_defaults(func=cmd_new)
+
+    pins_help = ("JSON file (format sf-test-plan-pins/1) of known, accepted differences: a plugin whose two sha256 "
+                 "values match its pin exactly is a warning, not a difference")
+    cb = sub.add_parser("compare-builds", parents=[common],
+                        help="check that two mod zips have the same plugins (exit 0 same, 1 different)")
+    cb.add_argument("tested", help="the zip that was tested")
+    cb.add_argument("built", help="the zip of the current build")
+    cb.add_argument("--pins", metavar="FILE", help=pins_help)
+    cb.add_argument("--json", action="store_true", help="print the result as JSON (format sf-test-plan-compare/1)")
+    cb.set_defaults(func=cmd_compare_builds)
+
+    ck = sub.add_parser("check-build", parents=[common],
+                        help="check that the plan's tested zip has the same plugins as a new build")
+    ck.add_argument("plan")
+    ck.add_argument("--built", required=True, metavar="ZIP", help="the zip of the current build")
+    ck.add_argument("--tested", metavar="ZIP",
+                    help="the zip that was tested (default: the plan's zip: line, relative to the plan's folder)")
+    ck.add_argument("--pins", metavar="FILE", help=pins_help)
+    ck.add_argument("--json", action="store_true", help="print the result as JSON (format sf-test-plan-compare/1)")
+    ck.set_defaults(func=cmd_check_build)
+
+    ng = sub.add_parser("ngplus", parents=[common],
+                        help="write one shared New Game+ plan from a base plan and the mods' New Game+ sections")
+    ng.add_argument("plans", nargs="+", metavar="plan", help="a mod's plan (its mod: line names its group)")
+    ng.add_argument("--base", required=True, metavar="FILE",
+                    help="the plan with the checks every mod shares (its groups come first)")
+    ng.add_argument("--order", required=True, metavar="FILE",
+                    help="JSON list of mod names that fixes each mod's group number; new mods are added to it "
+                         "(created if missing)")
+    ng.add_argument("--out", required=True, metavar="FILE", help="the shared plan to write (.testplan.md)")
+    ng.add_argument("--force", action="store_true", help="replace an existing --out file")
+    ng.set_defaults(func=cmd_ngplus)
     return p
 
 

@@ -20,8 +20,23 @@ _KEY_RE = re.compile(r"^([A-Za-z][A-Za-z0-9_-]*):(?:[ \t]+(.*?)|[ \t]*)$")
 _CHECK_RE = re.compile(r"^[-*][ \t]+\[[ xX]\](?:[ \t]+(.*?))?[ \t]*$")
 _BULLET_RE = re.compile(r"^[-*][ \t]+(?:\[[ xX]\][ \t]*)?(.*?)[ \t]*$")
 _ID_RE = re.compile(r"^(\d+)\.(\d+)$")
+_LOG_ID_RE = re.compile(r"^(?:(\d+)|([Ll]))\.(\d+)$")   # a Log check may pin <g>.<n> (any g) or L.<n>
 _YES = {"yes", "y", "true", "1", "on"}
 _NO = {"no", "n", "false", "0", "off"}
+
+
+_SCHEME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
+
+
+def ngplus_link_ok(value: str) -> bool:
+    """An ngplus: value is an http(s) address or a relative path: never another scheme (javascript:, data:, a
+    drive letter such as C:), a protocol-relative //host, or empty."""
+    v = value.strip()
+    if not v or any(ch in v for ch in "\"<>\x00") or v.startswith(("//", "\\\\")):
+        return False
+    if re.match(r"^https?://\S+$", v, re.I):
+        return True
+    return not _SCHEME_RE.match(v)
 
 
 def _lines(text: str) -> tuple[list[tuple[int, str, bool]], int]:
@@ -61,7 +76,7 @@ def _join(old: str, new: str) -> str:
 
 class _Parser:
     """A line-by-line state machine. States: header (title and key lines), intro (plan introduction),
-    setup (Before you start), group (a numbered group), ignore (under a heading with no number)."""
+    setup (Before you start), group (a numbered group), logs (Log checks), ignore (under a heading with no number)."""
 
     def __init__(self, path: str, rule_ids: set[str] | None):
         self.path = path
@@ -78,7 +93,10 @@ class _Parser:
         self.group_lines: dict[int, int] = {}
         self.run_line = 0
         self.header_keys_seen = False
-        self.last_field = "step"   # where a wrapped check line goes: step, expect, note or log
+        self.last_field = "step"   # where a wrapped check line goes: step, expect, note, logcheck or log
+        # the Log checks section's checks list is the plan's log_checks, so new_check can treat it like a group
+        self.log_group = Group(number=0, title="Log checks", checks=self.plan.log_checks)
+        self.ngplus_group = Group(number=0, title="New Game+", checks=self.plan.ngplus_checks)   # the same for NG+
 
     def problem(self, level: str, code: str, line: int, message: str) -> None:
         self.plan.problems.append(Problem(level, code, line, message))
@@ -91,6 +109,10 @@ class _Parser:
             return
         if self.target == "plan":
             self.plan.intro = self.plan.intro + "\n\n" + text if self.plan.intro else text
+        elif self.target == "logs":
+            self.plan.log_intro = self.plan.log_intro + "\n\n" + text if self.plan.log_intro else text
+        elif self.target == "ngplus":
+            self.plan.ngplus_intro = self.plan.ngplus_intro + "\n\n" + text if self.plan.ngplus_intro else text
         elif isinstance(self.target, Group):
             g = self.target
             g.intro = g.intro + "\n\n" + text if g.intro else text
@@ -132,7 +154,7 @@ class _Parser:
             self.state = "intro"
 
         cm = _CHECK_RE.match(raw)
-        if cm and self.state == "group":
+        if cm and self.state in ("group", "logs", "ngplus"):
             self.new_check(n, cm.group(1) or "")
             return
         if cm and self.state in ("intro", "setup") and not _indented(raw):
@@ -181,11 +203,19 @@ class _Parser:
                 self.problem("error", "bad-run", n,
                              f"run '{value}' isn't allowed. Use 1 to 64 letters, digits, '.', '_' or '-', "
                              "such as 'run: beacon-0.1.0'.")
+        elif k == "ngplus":
+            if not ngplus_link_ok(value):
+                self.problem("error", "bad-ngplus", n,
+                             f"ngplus '{value}' isn't a link the page can use. Give the shared New Game+ page as an "
+                             "http:// or https:// address, or as a path relative to this page, such as "
+                             "'ngplus: NewGamePlus.testplan.html'.")
+            else:
+                self.plan.ngplus = value
         elif k in model.HEADER_KEYS:
             setattr(self.plan, k, value)
         else:
             self.problem("warning", "unknown-key", n,
-                         f"unknown header key '{key}:' (ignored). The header keys are run, mod, version and zip. "
+                         f"unknown header key '{key}:' (ignored). The header keys are run, mod, version, zip and ngplus. "
                          "If this line is meant as introduction text, put a blank line between the header and it.")
 
     def setup_line(self, raw: str) -> None:
@@ -207,13 +237,28 @@ class _Parser:
             self.retarget(None)
             self.state = "setup"
             return
+        if text.lower() == model.LOGS_TITLE:
+            if not self.plan.log_line:
+                self.plan.log_line = n
+            self.retarget("logs")
+            self.group = self.log_group
+            self.state = "logs"
+            return
+        if text.lower() in model.NGPLUS_TITLES:
+            if not self.plan.ngplus_line:
+                self.plan.ngplus_line = n
+            self.retarget("ngplus")
+            self.group = self.ngplus_group
+            self.state = "ngplus"
+            return
         gm = _GROUP_RE.match(text)
         if not gm:
             self.retarget(None)
             self.state = "ignore"
             self.problem("error", "group-no-number", n,
                          f"the heading '## {text}' has no group number. Start it with a whole number, "
-                         f"such as '## 1 {text}', or make it '## Before you start'.")
+                         f"such as '## 1 {text}', or make it '## Before you start', '## Log checks' or "
+                         "'## New Game+'.")
             return
         num = int(gm.group(1))
         g = Group(number=num, title=(gm.group(2) or "").strip(), line=n)
@@ -234,7 +279,9 @@ class _Parser:
         g = self.group
         self.flush()
         pos = len(g.checks) + 1  # pinned checks still take their place, so later default ids don't move
-        c = Check(id=f"{g.number}.{pos}", group=g.number, step=step.strip(), line=n)
+        # NG+ checks get N.<n> only as a name for messages: `ngplus` numbers them in the shared plan
+        prefix = "L" if g is self.log_group else "N" if g is self.ngplus_group else str(g.number)
+        c = Check(id=f"{prefix}.{pos}", group=g.number, step=step.strip(), line=n)
         self.last_field = "step"
         g.checks.append(c)
         self.check = c
@@ -259,9 +306,20 @@ class _Parser:
         elif key == "note":
             c.note = _join(c.note, value)
             self.last_field = "note"
+        elif key == "logcheck":
+            c.logcheck = _join(c.logcheck, value)
+            self.last_field = "logcheck"
+        elif key == "smoke" and self.state == "ngplus":
+            self.problem("warning", "unknown-key", n,
+                         "'smoke:' is ignored in New Game+: the shared New Game+ page has no smoke test. Remove the "
+                         "line.")
         elif key == "smoke":
             v = value.lower()
-            if v in _YES:
+            if v in _YES and self.state == "logs":
+                self.problem("error", "smoke-log-check", n,
+                             "a Log check can't be in the smoke test: it isn't marked on the page. Remove the "
+                             "'smoke: yes' line, or move the check into a numbered group.")
+            elif v in _YES:
                 c.smoke = True
             elif v in _NO:
                 c.smoke = False
@@ -272,6 +330,19 @@ class _Parser:
         elif key == "log":
             self.add_log_ids(c, value, n)
             self.last_field = "log"
+        elif key == "id" and self.state == "ngplus":
+            self.problem("error", "bad-id", n,
+                         "a New Game+ check can't pin an id: `sf-test-plan ngplus` numbers it in the shared plan, and "
+                         "the order file keeps its group number. Remove the 'id:' line.")
+        elif key == "id" and self.state == "logs":
+            m = _LOG_ID_RE.match(value)
+            if not m:
+                self.problem("error", "bad-id", n,
+                             f"id '{value}' isn't L.<number> or <group>.<number>. Write it like 'id: L.1', or remove "
+                             "the line.")
+            else:
+                c.id = f"{int(m.group(1)) if m.group(1) else 'L'}.{int(m.group(3))}"
+                c.pinned = True
         elif key == "id":
             m = _ID_RE.match(value)
             if not m:
@@ -287,7 +358,7 @@ class _Parser:
         else:
             self.problem("warning", "unknown-key", n,
                          f"unknown check key '{km.group(1)}:' (kept as part of the step text). The check keys are "
-                         "Expect, smoke, log, note and id; reword the line if it isn't meant as one.")
+                         "Expect, smoke, log, logcheck, note and id; reword the line if it isn't meant as one.")
             c.step = _join(c.step, text)
 
     def add_log_ids(self, c: Check, text: str, n: int) -> None:
@@ -315,12 +386,16 @@ class _Parser:
             if not g.checks:
                 self.problem("warning", "empty-group", g.line,
                              f"group {g.number} has no checks. Add '- [ ] <step>' lines under it, or remove the heading.")
+        if p.log_line and not p.log_checks:
+            self.problem("warning", "empty-group", p.log_line,
+                         "the Log checks section has no checks. Add '- [ ] <what to look for>' lines under it, or "
+                         "remove the heading.")
         checks = p.checks()
         if not checks:
             self.problem("error", "no-checks", 0,
                          "the plan has no checks. Add '- [ ] <step>' lines under a '## 1 <title>' group heading.")
         seen: dict[str, Check] = {}
-        for c in checks:
+        for c in checks + p.log_checks:
             if c.id in seen:
                 fix = "change this check's 'id:' line" if c.pinned else "pin a different id on one of them with 'id:'"
                 self.problem("error", "dup-id", c.line,
@@ -346,6 +421,10 @@ class _Parser:
         for g in p.groups:
             log.debug("  group %d %r (line %d): %s", g.number, g.title, g.line,
                       ", ".join(c.id + (" smoke" if c.smoke else "") for c in g.checks) or "no checks")
+        if p.log_line:
+            log.debug("  Log checks (line %d): %s", p.log_line, ", ".join(c.id for c in p.log_checks) or "no checks")
+        if p.ngplus_line:
+            log.debug("  New Game+ (line %d): %d checks, left off this page", p.ngplus_line, len(p.ngplus_checks))
         for pr in p.problems:
             log.debug("  %s", pr.format(self.path))
         return p
@@ -394,6 +473,11 @@ def parse_file(path: str, rule_ids: set[str] | None = None) -> Plan:
 
 def load_rule_ids(rules_path: str) -> set[str]:
     """The expect and forbid ids of a papyrus-log-check rule file. Raises SetupError if unreadable."""
+    return rule_ids_of(load_rule_file(rules_path), rules_path)
+
+
+def load_rule_file(rules_path: str) -> dict:
+    """A papyrus-log-check rule file as a JSON object. Raises SetupError if it is unreadable or has the wrong shape."""
     text = _read_text(rules_path, "rule file")
     try:
         data = json.loads(text)
@@ -403,6 +487,12 @@ def load_rule_ids(rules_path: str) -> set[str]:
     if not isinstance(data, dict):
         raise SetupError(f"{rules_path} isn't a papyrus-log-check rule file: it should be a JSON object "
                          "with 'expect' and 'forbid' lists.")
+    rule_ids_of(data, rules_path)   # checks the shape
+    return data
+
+
+def rule_ids_of(data: dict, rules_path: str) -> set[str]:
+    """The expect and forbid ids of a rule file object. Raises SetupError when a list has the wrong shape."""
     ids: set[str] = set()
     for kind in ("expect", "forbid"):
         rules = data.get(kind, [])

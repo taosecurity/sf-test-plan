@@ -1,7 +1,7 @@
 # AGENTS.md: sf-test-plan for AI assistants
 
 Plain steps for an AI assistant helping someone use sf-test-plan. Every command here was run once on sf-test-plan
-0.3.2 before release. The [README](README.md) has the full description and [FORMAT.md](FORMAT.md) the exact formats.
+0.4.0 before release. The [README](README.md) has the full description and [FORMAT.md](FORMAT.md) the exact formats.
 
 ## 1. What it is for
 
@@ -21,12 +21,12 @@ it for automated tests, and don't treat its results as proof a mod is safe: it r
 
 ## 3. Install
 
-Download `sf-test-plan-0.3.2.zip` from https://github.com/taosecurity/sf-test-plan/releases and check it against the
+Download `sf-test-plan-0.4.0.zip` from https://github.com/taosecurity/sf-test-plan/releases and check it against the
 `.sha256` file:
 
-    certutil -hashfile sf-test-plan-0.3.2.zip SHA256
+    certutil -hashfile sf-test-plan-0.4.0.zip SHA256
 
-On Linux or macOS: `sha256sum -c sf-test-plan-0.3.2.zip.sha256`. Unpack it anywhere. The commands below run from
+On Linux or macOS: `sha256sum -c sf-test-plan-0.4.0.zip.sha256`. Unpack it anywhere. The commands below run from
 the unpacked folder; `python -I sf_test_plan.py` works everywhere, `.\sf-test-plan.cmd` (Windows, with the `.\`) and
 `./sf-test-plan` (Linux, macOS) are short forms.
 
@@ -82,6 +82,36 @@ It prints `examples/Beacon.testplan.md: 3 groups, 6 checks, 5 smoke; 0 errors, 0
   Rules you didn't delete keep their patterns. `--plugin` with `--from` is refused (exit 2): edit the file's
   `plugins` list instead. When something would be written, an output file that is a symbolic link, read-only or not a regular file is refused (exit 2): give another name with `--out`. A linked `--from` file with nothing to add still exits 0.
 
+- Check that the zip that was tested is the build about to be released (exit 0 same plugins, 1 different, 2 bad
+  input; `--json` prints JSON, `--pins pins.json` accepts a known pair of differences, shown as a warning):
+
+      python -I sf_test_plan.py compare-builds Tested-0.1.0.zip Built-0.1.0.zip
+      python -I sf_test_plan.py check-build MyMod.testplan.md --built Built-0.1.0.zip
+
+  `check-build` takes the tested zip from the plan's `zip:` line (relative to the plan), or from `--tested`.
+
+- Write only the part of the page a host web page embeds, plus the script and style sheet it needs:
+
+      python -I sf_test_plan.py render MyMod.testplan.md --fragment --out frag.html --assets assets
+
+  The host page links `assets/sf-test-plan.css`, has a viewport meta tag, holds one fragment and loads
+  `assets/sf-test-plan.js` after it. `--force` replaces an `--assets` file that has other contents. Without `--out`
+  the page goes to stdout and the report to stderr.
+
+- Check a plan against the project's own writing rules (smoke count, ISO dates, full sentences, banned words) from a
+  JSON file in the `sf-test-plan-style/1` format; `examples/style.json` is a sample:
+
+      python -I sf_test_plan.py check MyMod.testplan.md --style examples/style.json
+
+  `build` and `render` take `--style` too; with `"level": "error"`, style problems exit 1 and nothing is written.
+
+- Checks done in the logs after play go under a `## Log checks` heading (ids `L.1`, `L.2`, ...; shown as a table, not
+  counted in the tally); a check can carry a `logcheck: <text>` line. A mod's New Game+ checks go under
+  `## New Game+` and are left off its page; a header line `ngplus: <link>` links the shared page. To write the shared
+  page's plan from a base plan, an order file (JSON list of mod names, created if missing) and the mods' plans:
+
+      python -I sf_test_plan.py ngplus --base Base.testplan.md --order order.json --out NewGamePlus.testplan.md MyMod.testplan.md
+
 - Start a new test round for a new build: change the plan's `run:` line (for example `my-mod-0.1.1`) and build again.
   The page then starts with empty marks.
 
@@ -102,6 +132,10 @@ Run `check` after every edit and fix what it reports before building.
 | `import` | a marks file; the plan; the results file | `<plan>.results.json` (new row first) |
 | `logs` | a papyrus-log-check JSON report; the plan | a marks file (`--out`, default `<report>.marks.json`; never the plan, the report or the results file, and refuses an output that is a symbolic link, a read-only file or not a regular file) |
 | `rules` | the plan; the `--from` rule file if given | a rule file (`--out`, default the `--from` file, else `<plan name>.logrules.json`; refuses to replace a file without `--force`, never writes over the plan or the results file, and refuses an output that is a symbolic link, a read-only file or not a regular file); writes nothing when no id is missing |
+| `render` | as `build`, plus a `--style` file | the page or `--fragment` (`--out`, else stdout); with `--assets DIR`, `sf-test-plan.js` and `sf-test-plan.css` in DIR (an existing file with other contents only with `--force`) |
+| `compare-builds` | two mod zips; a `--pins` file if given | nothing (prints the result; `--json` for JSON) |
+| `check-build` | the plan; its tested zip (the `zip:` line or `--tested`); the `--built` zip; a `--pins` file if given | nothing |
+| `ngplus` | the base plan; the mods' plans; the `--order` file | the shared plan (`--out`; refuses to replace a file without `--force`) and the order file (created or extended) |
 | `new` | nothing | the starter plan (refuses to replace a file without `--force`) |
 
 `<plan>.results.json` means the plan's name without `.md`, plus `.results.json`
@@ -110,7 +144,7 @@ Run `check` after every edit and fix what it reports before building.
 and `Beacon.logrules.json`, and a plan named `Cool.Mod.txt` gives the mod name "Cool.Mod" but the
 files `Cool.Mod.txt.html`, `Cool.Mod.txt.logrules.json` and `Cool.Mod.txt.results.json`.
 
-Exit codes: 0 done (warnings allowed); 1 the plan has errors (printed as `file:line: error code: message`); 2 bad
+Exit codes: 0 done (warnings allowed; `--help` always exits 0; `compare-builds` and `check-build`: the plugins are the same); 1 the plan has errors (printed as `file:line: error code: message`; `compare-builds` and `check-build`: the plugins differ); 2 bad
 input or setup (a file can't be read or written, a folder given where a file belongs, bad JSON, a marks file in another format, a wrong option).
 
 Logs: add `--verbose` to print details on stderr, or `--log FILE` to write them to a file. Ask the user for that log

@@ -1,0 +1,12 @@
+{
+  "format": "sf-test-plan-style/1",
+  "level": "error",
+  "smoke": {"min": 3, "max": 12},
+  "iso_dates": true,
+  "full_sentences": true,
+  "banned": [
+    "obviously",
+    {"word": "just", "use": "nothing (leave it out)"},
+    {"word": "slate", "use": "note"}
+  ]
+}
