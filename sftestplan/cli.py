@@ -194,11 +194,15 @@ def _same_file(a: str, b: str) -> bool:
     return sa.st_ino != 0 and (sa.st_ino, sa.st_dev) == (sb.st_ino, sb.st_dev)
 
 
-def _free_name(default: str, protected) -> str:
+def _free_name(default: str, protected, skip_existing: bool = False) -> str:
     """A name for a refusal hint: default, else default with "-2", "-3" ... before its ending, the first that is
-    neither a protected file nor already on disk (so following the hint never runs into "already exists")."""
+    not a protected file. With skip_existing (rules, which refuses an existing output without --force) it must
+    not be on disk either, so following the hint never runs into "already exists". build and logs overwrite
+    their output, so their hint keeps the usual default name when it is on disk but not protected."""
     def free(name):
-        return not os.path.lexists(name) and not any(_same_file(name, p) for p in protected)
+        if skip_existing and os.path.lexists(name):
+            return False
+        return not any(_same_file(name, p) for p in protected)
     if free(default):
         return default
     stem, ext = os.path.splitext(default)
@@ -271,13 +275,13 @@ def cmd_rules(args) -> int:
                          f"file (.json).")
     out = args.out or (args.from_file if args.from_file else _default_rules_out(args.plan))
     protected = (args.plan, results.results_path(args.plan))
-    hint = _free_name(_default_rules_out(args.plan), protected)
+    hint = _free_name(_default_rules_out(args.plan), protected, skip_existing=True)
     # Without --out the rule file is the --from file, so a refusal names the option the path came from.
     if args.out:
         given, fix = f"--out {out}", "Give the rule file another name with --out"
     elif args.from_file:
         given = f"--from {out}"
-        fix = "Without --out, the rule file is written back to the --from file, so give it another name with --out"
+        fix = "Without --out, the rule file is written back to the --from file, so give the rule file another name with --out"
     else:
         given, fix = f"The default rule file {out}", "Give the rule file another name with --out"
     if _same_file(out, args.plan):

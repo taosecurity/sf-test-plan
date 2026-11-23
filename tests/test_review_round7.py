@@ -98,11 +98,12 @@ class Round7(unittest.TestCase):
         self.assertNotIn("--out " + os.path.join(self.d, "p.testplan.html") + " is", err)
         self.assertEqual(self.read(self.plan), PLAN)
 
-    # Finding 4: the hint skips names that are already on disk.
+    # Finding 4: the rules hint skips names that are already on disk (round 9: only with skip_existing).
     def test_free_name_skips_files_on_disk(self):
         taken = os.path.join(self.d, "q.json")
         self.write(os.path.join(self.d, "q-2.json"), "x")
-        self.assertEqual(cli._free_name(taken, [taken]), os.path.join(self.d, "q-3.json"))
+        self.assertEqual(cli._free_name(taken, [taken], skip_existing=True), os.path.join(self.d, "q-3.json"))
+        self.assertEqual(cli._free_name(taken, [taken]), os.path.join(self.d, "q-2.json"))
 
     # Finding 5: hard links for logs --out and rules --out.
     def test_logs_out_hard_link_to_plan_report_or_results(self):

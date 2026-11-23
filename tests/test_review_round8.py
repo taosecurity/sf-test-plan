@@ -55,7 +55,7 @@ class Round8(unittest.TestCase):
     def test_free_name_skips_an_existing_default(self):
         default = os.path.join(self.d, "q.json")
         self.write(default, "x")
-        self.assertEqual(cli._free_name(default, [self.plan]), os.path.join(self.d, "q-2.json"))
+        self.assertEqual(cli._free_name(default, [self.plan], skip_existing=True), os.path.join(self.d, "q-2.json"))
 
     def test_rules_hint_skips_an_existing_default_rule_file(self):
         default = cli._default_rules_out(self.plan)
@@ -76,7 +76,7 @@ class Round8(unittest.TestCase):
         code, out, err = run("rules", self.plan, "--from", self.plan)
         self.assertEqual(code, 2, out + err)
         self.assertIn("--from " + self.plan + " is the plan itself. Without --out, the rule file is written back "
-                      "to the --from file, so give it another name with --out, such as ", err)
+                      "to the --from file, so give the rule file another name with --out, such as ", err)
 
     # Finding 5: the default-name wording for logs and rules.
     def test_logs_default_marks_file_linked_to_plan(self):
