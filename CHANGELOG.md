@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.3.1 (unreleased)
+
+### Example
+
+A `rules` run on the bundled example plan whose rule file already exists is refused, and now prints only the error (on stderr, exit 2), with no counts first:
+
+    > sf-test-plan rules examples\Beacon.testplan.md
+    sf-test-plan: examples\Beacon.logrules.json already exists: pick another --out, or add --force to replace it.
+
+With the old rule file moved away, the same command writes it:
+
+    > sf-test-plan rules examples\Beacon.testplan.md
+    examples\Beacon.testplan.md: 3 log ids on 3 steps
+    New expect rule 'loaded' (step 1.1): re "BeaconMod: loaded"
+    New expect rule 'placed' (step 2.2): re "BeaconMod: placed"
+    New expect rule 'restored' (step 3.1): re "BeaconMod: restored"
+    Rule file: examples\Beacon.logrules.json. Edit each new 're' to match the line your mod writes, and move a rule for a line that must never appear to 'forbid'. Then run: sf-test-plan check examples\Beacon.testplan.md --rules examples\Beacon.logrules.json
+
+### Fixes
+
+- A file path that isn't valid Unicode (a Linux file name with bytes that aren't UTF-8, or a Windows name with a lone surrogate) no longer breaks `--log`: the log file writes it as `\udcff` instead of printing a "Logging error" for each line.
+- `build` now writes the page for a plan in such a folder. Before, it stopped with "unexpected error" while making the page's storage key. Other folder names get the same key as before, so their pages keep their marks.
+- Paths with characters a cp1252 or ASCII console can't show were already printed safely (with `?`), on stdout and stderr, by every command. Tests now cover that too.
+- A `rules` run that is refused (the output is a link, or it already exists without `--force`) now prints only the error. Before, it printed the counts and the "Already in" line first, as if it were going to write. A linked `--from` file with nothing to add still prints its counts and "Nothing to add" and exits 0.
+
 ## 0.3.0 (2026-11-20)
 
 ### What's new
@@ -86,12 +111,12 @@ Download `sf-test-plan-0.2.0.zip` below, unpack it and follow the Install steps 
 
 ## 0.1.0 (2026-11-19)
 
-First release.
+This is the first release.
 
-- `build`: one self-contained checklist page from a Markdown test plan: Pass / Fail / Skip and a note per step, smoke test and folded deep checks, Copy buttons for console commands, light and dark theme, phone width, no network loads.
+- `build` makes one self-contained checklist page from a Markdown test plan. The page has Pass / Fail / Skip and a note per step, a smoke test and folded deep checks, Copy buttons for console commands, a light and dark theme, and a phone-width layout, and it loads nothing from the network.
 - The page keeps marks in the browser, with Export and Import (JSON, `sf-test-plan-marks/1`), Copy results and Reset.
-- `check`: finds plan mistakes (missing `run:`, duplicate ids, keys with no step, unknown `log:` ids with `--rules`, and more), each with its line number and the fix.
-- `import`: adds a marks file to `<plan>.results.json`; `build` shows it as the page's Results log.
-- `logs`: turns a papyrus-log-check (0.3.0 or later) JSON report into marks for steps with `log:` ids.
-- `new`: writes a starter plan.
-- `--verbose` and `--log FILE` on every command.
+- `check` finds plan mistakes (missing `run:`, duplicate ids, keys with no step, unknown `log:` ids with `--rules`, and more), each with its line number and the fix.
+- `import` adds a marks file to `<plan>.results.json`, and `build` shows it as the page's Results log.
+- `logs` turns a papyrus-log-check (0.3.0 or later) JSON report into marks for steps with `log:` ids.
+- `new` writes a starter plan.
+- Every command takes `--verbose` and `--log FILE`.

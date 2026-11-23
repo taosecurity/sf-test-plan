@@ -26,7 +26,8 @@ def _setup_logging(verbose: bool, log_file: str | None) -> None:
         log.addHandler(h)
     if log_file:
         try:
-            fh = logging.FileHandler(log_file, mode="w", encoding="utf-8")
+            # backslashreplace: a path that isn't valid Unicode is written as \udcff, not a logging error
+            fh = logging.FileHandler(log_file, mode="w", encoding="utf-8", errors="backslashreplace")
         except OSError as e:
             raise SetupError(f"can't write the log file {log_file}: {e.strerror}. Pick a folder you can write to.")
         fh.setLevel(logging.DEBUG)
@@ -219,17 +220,18 @@ def cmd_rules(args) -> int:
                   else f"--prefix or the plan {args.plan}")
         raise SetupError(f"the rule file would hold text that can't be saved as UTF-8 ({e.reason}). It comes from "
                          f"{source}: look for a broken escape such as a lone \\ud800. Nothing was written.")
-    print(counts)
     old_prefix = base.get("prefix") if base is not None else None
     prefix_changed = base is not None and args.prefix is not None and old_prefix != data["prefix"]
-    if base is not None:
-        kept = len(uses) - len(added)
-        print(f"Already in {args.from_file}: {kept} of the {_count(len(uses), 'id')}.")
-        if not added and not prefix_changed:
-            print("Nothing to add, so nothing was written.")
-            return 0
+    kept_line = (f"Already in {args.from_file}: {len(uses) - len(added)} of the {_count(len(uses), 'id')}."
+                 if base is not None else None)
+    if base is not None and not added and not prefix_changed:
+        print(counts)
+        print(kept_line)
+        print("Nothing to add, so nothing was written.")
+        return 0
     # The output file itself is never a link: replacing a link's target (or the link) is a surprise either way.
     # Checked only when something will be written, so a linked --from file with nothing to add still exits 0.
+    # Both refusals come before any output, so a refused run prints only its error (0.3.1).
     if os.path.islink(out):
         raise SetupError(f"{out} is a link; give the real file with --out.")
     if os.path.lexists(out) and not args.force:
@@ -238,6 +240,9 @@ def cmd_rules(args) -> int:
         else:
             hint = "pick another --out, or add --force to replace it"
         raise SetupError(f"{out} already exists: {hint}.")
+    print(counts)
+    if kept_line is not None:
+        print(kept_line)
     if prefix_changed:
         new = json.dumps(data["prefix"])
         if isinstance(old_prefix, str) and old_prefix:

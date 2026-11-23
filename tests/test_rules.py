@@ -504,14 +504,41 @@ class SimplifyRoundTests(unittest.TestCase):
         with open(target, encoding="utf-8") as f:
             self.assertEqual(f.read(), before)
 
+    def _snapshot(self, path):
+        """The file's bytes and modified time, and the folder's listing."""
+        with open(path, "rb") as f:
+            data = f.read()
+        return data, os.stat(path).st_mtime_ns, sorted(os.listdir(self.d))
+
     def test_a_linked_from_file_with_nothing_to_add_still_exits_0(self):
         target = self._rules(drop=())
+        # An old modified time, so a rewrite in the same clock tick still shows.
+        os.utime(target, ns=(1_000_000_000_000_000_000, 1_000_000_000_000_000_000))
+        before = self._snapshot(target)
         real_islink = os.path.islink
         with mock.patch("sftestplan.cli.os.path.islink", side_effect=lambda p: p == target or real_islink(p)):
             code, out, err = run("rules", self.plan, "--from", target)
         self.assertEqual(code, 0, err)
         self.assertIn("Nothing to add, so nothing was written.", out)
         self.assertNotIn("is a link", err)
+        self.assertEqual(self._snapshot(target), before)
+
+    def test_a_real_symlinked_from_file_with_nothing_to_add_is_left_alone(self):
+        real = self._rules(drop=())
+        link = os.path.join(self.d, "link.logrules.json")
+        try:
+            os.symlink(real, link)
+        except (OSError, NotImplementedError) as e:
+            self.skipTest(f"can't make a symlink here: {e}")
+        os.utime(real, ns=(1_000_000_000_000_000_000, 1_000_000_000_000_000_000))
+        before = self._snapshot(real)
+        before_target = os.readlink(link)
+        code, out, err = run("rules", self.plan, "--from", link)
+        self.assertEqual(code, 0, err)
+        self.assertIn("Nothing to add, so nothing was written.", out)
+        self.assertTrue(os.path.islink(link))
+        self.assertEqual(os.readlink(link), before_target)
+        self.assertEqual(self._snapshot(real), before)
 
     def test_a_real_symlink_is_refused(self):
         real = self._rules()
@@ -543,6 +570,55 @@ class SimplifyRoundTests(unittest.TestCase):
             code, _, err = run("rules", self.plan, "--out", target)
         self.assertEqual(code, 2)
         self.assertIn("already exists", err)
+
+    # 0.3.1: a refused run prints only its error (nothing on stdout before the refusal)
+    def test_a_refused_link_run_prints_nothing_on_stdout(self):
+        target = self._rules()
+        real_islink = os.path.islink
+        with mock.patch("sftestplan.cli.os.path.islink", side_effect=lambda p: p == target or real_islink(p)):
+            code, out, err = run("rules", self.plan, "--from", target, "--force")
+        self.assertEqual(code, 2)
+        self.assertEqual(out, "")
+        self.assertIn(f"{target} is a link; give the real file with --out.", err)
+
+    def test_a_refused_real_symlink_run_prints_nothing_on_stdout(self):
+        real = self._rules()
+        link = os.path.join(self.d, "link.logrules.json")
+        try:
+            os.symlink(real, link)
+        except (OSError, NotImplementedError) as e:
+            self.skipTest(f"can't make a symlink here: {e}")
+        code, out, err = run("rules", self.plan, "--from", link, "--force")
+        self.assertEqual(code, 2)
+        self.assertEqual(out, "")
+        self.assertIn("is a link", err)
+
+    def test_a_refused_existing_file_run_prints_nothing_on_stdout(self):
+        target = self._rules()
+        code, out, err = run("rules", self.plan, "--from", target)
+        self.assertEqual(code, 2)
+        self.assertEqual(out, "")
+        self.assertIn(f"{target} already exists: add --force to add the new rules to it.", err)
+
+    def test_a_refused_new_out_run_prints_nothing_on_stdout(self):
+        target = os.path.join(self.d, "Beacon.logrules.json")
+        write(target, "keep me")
+        code, out, err = run("rules", self.plan)
+        self.assertEqual(code, 2)
+        self.assertEqual(out, "")
+        self.assertIn("already exists: pick another --out", err)
+
+    def test_a_linked_from_file_with_nothing_to_add_still_prints_its_counts(self):
+        target = self._rules(drop=())
+        real_islink = os.path.islink
+        with mock.patch("sftestplan.cli.os.path.islink", side_effect=lambda p: p == target or real_islink(p)):
+            code, out, err = run("rules", self.plan, "--from", target)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out.splitlines(), [
+            f"{self.plan}: 3 log ids on 3 steps",
+            f"Already in {target}: 3 of the 3 ids.",
+            "Nothing to add, so nothing was written.",
+        ])
 
     # 3: mode and temp-file cleanup
     def test_mode_is_put_back_on_the_file_after_the_move(self):

@@ -159,7 +159,9 @@ def render(plan: Plan, results: list[dict] | None = None) -> str:
     else:
         name = title
     mod = " ".join(plan.mod.split()).casefold()
-    plan_id = hashlib.sha256(f"{name}\n{mod}\n{plan.run}".encode("utf-8")).hexdigest()[:12]
+    # surrogatepass: a folder name that isn't valid Unicode (Linux bytes, a Windows lone surrogate) still gets a key;
+    # every other name encodes as before, so existing pages keep their marks.
+    plan_id = hashlib.sha256(f"{name}\n{mod}\n{plan.run}".encode("utf-8", "surrogatepass")).hexdigest()[:12]
     config = {"format": model.PAGE_FORMAT, "run": plan.run, "title": title, "tool": model.TOOL_ID,
               "mod": plan.mod, "version": plan.version, "zip": plan.zip, "total": total, "plan": plan_id}
 
