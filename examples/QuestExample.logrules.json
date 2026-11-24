@@ -1,0 +1,17 @@
+{
+ "mod": "Tidewater Errand",
+ "version": "0.1.0",
+ "plugins": ["TidewaterErrand.esm"],
+ "prefix": "\\[TWE\\]",
+ "scripts": "TWE:",
+ "expect": [
+  {"id": "started", "re": "\\[TWE\\] started", "show": "[TWE] started", "means": "The quest script started at the beginning of the game."},
+  {"id": "stage-10", "re": "\\[TWE\\] stage 10: quest started", "show": "[TWE] stage 10: quest started", "means": "Stage 10 was set when the player first reached a spaceport."},
+  {"id": "stage-20", "re": "\\[TWE\\] stage 20: letter read", "show": "[TWE] stage 20: letter read", "means": "Stage 20 was set when the player read the letter."},
+  {"id": "stage-30", "re": "\\[TWE\\] stage 30: copper delivered", "show": "[TWE] stage 30: copper delivered", "means": "Stage 30 was set and the quest finished."}
+ ],
+ "order": [["started", "stage-10", "stage-20", "stage-30"]],
+ "forbid": [
+  {"id": "no-script-errors", "re": "(?i)error:.*TWE:", "means": "No Papyrus error names a TWE script."}
+ ]
+}

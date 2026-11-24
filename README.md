@@ -143,6 +143,21 @@ Every command also takes `--verbose` and `--log FILE`. The exit codes are:
 examples\Beacon.testplan.md: 3 groups, 6 checks, 5 smoke; 0 errors, 0 warnings
 ```
 
+### A quest example
+
+`examples\QuestExample.testplan.md` is a plan for a made-up quest mod, Tidewater Errand, whose quest has three stages. It shows how to test a quest honestly:
+
+- Each stage has one check that plays the stage, one check that types `getstage <QuestID>` in the console and says what number to expect, and a `note:` that names the console fix (`setstage <QuestID> <stage>`) for a stage that never starts. A stage you moved by hand is a Fail, so the note says to mark it.
+- The mod writes one `Debug.Trace` line for each stage change, and the plan's `log:` ids point at those lines. The rule file `examples\QuestExample.logrules.json` proves them, and its `order` rule proves that the stages came in the right order.
+- The Log checks group tells the tester to read the quest's stages in the save with `sf-save-reader quests <save> --filter <name> --details`.
+
+```
+> sf-test-plan check examples\QuestExample.testplan.md --rules examples\QuestExample.logrules.json
+examples\QuestExample.testplan.md: 5 groups, 10 checks, 5 smoke; 0 errors, 0 warnings
+```
+
+Copy the two files, change the names, the quest ID and the log lines to your own, and keep one check per stage.
+
 ### import
 
 After a test round, add the marks file the tester exported to the plan's results, then build again to show them on the page as the Results log. This run uses a sample marks file from the repo's `tests\fixtures` folder:
