@@ -55,13 +55,13 @@ This plan tests Tidewater Errand 0.1.0, a made-up example quest mod. The quest h
   note: No `log:` id here: the stage 30 line from your first character would pass this check without testing it.
 
 ## Log checks
-After play, run papyrus-log-check on the Papyrus log with the rule file `QuestExample.logrules.json`. Its `order` rule proves that the stages came in the right order. To see the quest's stages in a save, run `sf-save-reader quests <save> --data <Data folder> --filter Tidewater --details` (the `--data` folder gives the quest its name).
+After groups 1 to 4, and before the edge cases (a game restart starts a new log), run papyrus-log-check on the Papyrus log with the rule file `QuestExample.logrules.json`. Its `order` rule proves that the stages came in the right order. To see the quest's stages in a save, run `sf-save-reader quests <save> --data <Data folder> --filter Tidewater --details` (the `--data` folder gives the quest its name).
 
 - [ ] The quest script started at the beginning of the game.
   Expect: a `[TWE] started, version 0.1.0` line.
   log: started
 - [ ] The stages came in order: 10, then 20, then 30.
-  Expect: the three `[TWE] stage` lines appear in that order, and papyrus-log-check shows `PASS order` for the rule.
+  Expect: the three `[TWE] stage` lines appear in that order, and the report's line `order started > stage-10 > stage-20 > stage-30` says PASS and "in order".
   note: An order rule has no id of its own, so `sf-test-plan logs` can't mark this check. Read the report's order line and mark the check yourself.
 - [ ] No stage was set before the stage that must come first.
   Expect: no `[TWE] WARNING: stage ... set before stage ...` line. A console `setstage` that skips ahead writes one.
