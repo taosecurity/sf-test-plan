@@ -44,20 +44,21 @@ This plan tests Tidewater Errand 0.1.0, a made-up example quest mod. The quest h
   log: stage-30
 - [ ] Type `getstage TWE_Quest` in the console.
   Expect: 30.
+  note: If holding 3 Copper doesn't finish the quest, type `setstage TWE_Quest 30` to go on, and mark this check Fail.
 
 ## 5 Edge cases
-- [ ] On a second new character, pick up 3 Copper before you land at a spaceport, then read the letter.
-  Expect: the quest goes through stage 20 to stage 30 as soon as you read the letter.
+- [ ] On a second new character, pick up 3 Copper before your first spaceport, then land at a spaceport and read the letter.
+  Expect: stage 10 starts when you land, and the quest goes through stage 20 to stage 30 as soon as you read the letter.
   note: No `log:` id here: the stage 30 line from your first character would pass this check without testing it.
 - [ ] Save at stage 20, quit to the main menu and load the save.
   Expect: the objective is still shown, and collecting the Copper still finishes the quest.
   smoke: yes
 
 ## Log checks
-After play, run papyrus-log-check on the Papyrus log with the rule file `QuestExample.logrules.json`. Its `order` rule proves that the stages came in the right order. To see the quest's stages in a save, run `sf-save-reader quests <save> --filter Tidewater --details`.
+After play, run papyrus-log-check on the Papyrus log with the rule file `QuestExample.logrules.json`. Its `order` rule proves that the stages came in the right order. To see the quest's stages in a save, run `sf-save-reader quests <save> --data <Data folder> --filter Tidewater --details` (the `--data` folder gives the quest its name).
 
 - [ ] The quest script started at the beginning of the game.
-  Expect: a `[TWE] started` line.
+  Expect: a `[TWE] started, version 0.1.0` line.
   log: started
 - [ ] The stages came in order: 10, then 20, then 30.
   Expect: the three `[TWE] stage` lines appear in that order, and papyrus-log-check shows `PASS order` for the rule.
