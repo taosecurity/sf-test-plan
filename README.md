@@ -40,7 +40,7 @@ Broken.testplan.md: 3 groups, 6 checks, 5 smoke; 1 errors, 0 warnings
 ## Install (two minutes)
 
 1. Install Python 3.11 or newer from [python.org](https://www.python.org/downloads/). On the first screen of the installer, tick **Add python.exe to PATH**. To check that it worked, open a new Command Prompt and type `python --version`. It should print a version number. (sf-test-plan itself needs Python 3.10 or newer, and is tested on 3.10 and 3.13 on Windows and Linux.)
-2. Download `sf-test-plan-0.4.0.zip` from the [releases page](https://github.com/taosecurity/sf-test-plan/releases) and unpack it anywhere.
+2. Download `sf-test-plan-0.4.1.zip` from the [releases page](https://github.com/taosecurity/sf-test-plan/releases) and unpack it anywhere.
 3. Open the unpacked folder in File Explorer, click the address bar at the top, type `cmd` and press Enter. A Command Prompt window opens in that folder, ready for the commands below.
 4. Build the example page with `sf-test-plan build examples\Beacon.testplan.md`, as in the Example above, and open `examples\Beacon.testplan.html` in your browser.
 
@@ -382,7 +382,7 @@ This is what `--verbose` prints for the example plan:
 
 ```
 > sf-test-plan check examples\Beacon.testplan.md --verbose
-[verbose] sf-test-plan 0.4.0, Python 3.13.15, args ['check', 'examples\\Beacon.testplan.md', '--verbose']
+[verbose] sf-test-plan 0.4.1, Python 3.13.15, args ['check', 'examples\\Beacon.testplan.md', '--verbose']
 [verbose] read plan examples\Beacon.testplan.md (1356 characters)
 [verbose] parsed examples\Beacon.testplan.md: title 'Beacon Mod test plan', run 'beacon-0.1.0', 2 setup items, 3 groups, 6 checks (5 smoke), 0 problems
 [verbose]   group 1 'Install and load' (line 13): 1.1 smoke, 1.2 smoke

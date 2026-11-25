@@ -12,6 +12,6 @@
  ],
  "order": [["started", "stage-10", "stage-20", "stage-30"]],
  "forbid": [
-  {"id": "no-script-errors", "re": "(?i)error:.*TWE:", "means": "No Papyrus error names a TWE script."}
+  {"id": "no-skipped-stage", "re": "\\[TWE\\] WARNING: stage \\d+ set before stage \\d+", "means": "A stage was set before the stage that must come first, for example by a console setstage."}
  ]
 }

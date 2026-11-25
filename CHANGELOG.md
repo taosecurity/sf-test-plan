@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.1 (unreleased)
+
+This release adds an example plan for a quest mod. The program itself is unchanged.
+
+### What's new
+
+- `examples\QuestExample.testplan.md` and `examples\QuestExample.logrules.json` test a made-up three-stage quest, Tidewater Errand. Each stage has a check that plays it and a check that types `getstage <QuestID>`, the Log checks section ties the stage lines to the rule file's ids, and an `order` rule proves the stages came in order. The rule ids match papyrus-log-check's quest example. The README has a "A quest example" section.
+
+### Example
+
+    > sf-test-plan check examples\QuestExample.testplan.md --rules examples\QuestExample.logrules.json
+    examples\QuestExample.testplan.md: 5 groups, 10 checks, 5 smoke; 0 errors, 0 warnings
+
 ## 0.4.0 (2026-11-23)
 
 This release adds what a team that keeps many plans needs: a check that the tested zip is the build being released, a table of checks done in the logs, shared New Game+ plans, your own writing rules for `check`, and a `render` command that writes only the part of the page a host page embeds.

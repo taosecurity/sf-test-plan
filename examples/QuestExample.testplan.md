@@ -62,6 +62,6 @@ After play, run papyrus-log-check on the Papyrus log with the rule file `QuestEx
 - [ ] The stages came in order: 10, then 20, then 30.
   Expect: the three `[TWE] stage` lines appear in that order, and papyrus-log-check shows `PASS order` for the rule.
   note: An order rule has no id of its own, so `sf-test-plan logs` can't mark this check. Read the report's order line and mark the check yourself.
-- [ ] No Papyrus error names a TWE script.
-  Expect: no `error:` line that names TWE:ErrandQuestScript.
-  log: no-script-errors
+- [ ] No stage was set before the stage that must come first.
+  Expect: no `[TWE] WARNING: stage ... set before stage ...` line. A console `setstage` that skips ahead writes one.
+  log: no-skipped-stage
