@@ -26,7 +26,7 @@ This plan tests Tidewater Errand 0.1.0, a made-up example quest mod. The quest h
   log: stage-10
 - [ ] Type `getstage TWE_Quest` in the console.
   Expect: 10.
-  note: If stage 10 never starts, type `setstage TWE_Quest 10` to go on, and mark this group Fail with a note of where you were.
+  note: If stage 10 never starts, type `setstage TWE_Quest 10` to go on, and mark this check Fail with a note of where you were.
 
 ## 3 Stage 20: read the letter
 - [ ] Read the letter from your inventory (Inventory > Notes, then Read).
@@ -38,7 +38,7 @@ This plan tests Tidewater Errand 0.1.0, a made-up example quest mod. The quest h
   note: If reading the letter doesn't start stage 20, type `setstage TWE_Quest 20` to go on, and mark this check Fail.
 
 ## 4 Stage 30: finish the quest
-- [ ] Pick up Copper until you hold 3 (or type `player.additem 00000F3A 3` in the console).
+- [ ] Pick up Copper until you hold 3 (or find Copper's ID with `help copper 4` in the console and type `player.additem <ID> 3`).
   Expect: the objective "Collect 3 Copper" is completed, and the Missions menu shows "Tidewater Errand" as completed.
   smoke: yes
   log: stage-30
@@ -48,7 +48,7 @@ This plan tests Tidewater Errand 0.1.0, a made-up example quest mod. The quest h
 ## 5 Edge cases
 - [ ] On a second new character, pick up 3 Copper before you land at a spaceport, then read the letter.
   Expect: the quest goes through stage 20 to stage 30 as soon as you read the letter.
-  log: stage-30
+  note: No `log:` id here: the stage 30 line from your first character would pass this check without testing it.
 - [ ] Save at stage 20, quit to the main menu and load the save.
   Expect: the objective is still shown, and collecting the Copper still finishes the quest.
   smoke: yes

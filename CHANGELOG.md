@@ -6,7 +6,7 @@ This release adds an example plan for a quest mod. The program itself is unchang
 
 ### What's new
 
-- `examples\QuestExample.testplan.md` and `examples\QuestExample.logrules.json` test a made-up three-stage quest, Tidewater Errand. Each stage has a check that plays it and a check that types `getstage <QuestID>`, the Log checks section ties the stage lines to the rule file's ids, and an `order` rule proves the stages came in order. The rule ids match papyrus-log-check's quest example. The README has a "A quest example" section.
+- `examples\QuestExample.testplan.md` and `examples\QuestExample.logrules.json` test a made-up three-stage quest, Tidewater Errand. Each stage has a check that plays it and a check that types `getstage <QuestID>`, the Log checks section ties the stage lines to the rule file's ids, and an `order` rule proves the stages came in order. The rule ids match papyrus-log-check's quest example. The README has an "A quest example" section that explains it.
 
 ### Example
 
