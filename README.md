@@ -147,7 +147,7 @@ examples\Beacon.testplan.md: 3 groups, 6 checks, 5 smoke; 0 errors, 0 warnings
 
 `examples\QuestExample.testplan.md` is a plan for a made-up quest mod, Tidewater Errand, whose quest has three stages. It shows how to test a quest honestly:
 
-- Each stage has one check that plays the stage, one check that types `getstage <QuestID>` in the console and says what number to expect, and a `note:` that names the console fix (`setstage <QuestID> <stage>`) for a stage that never starts. A stage you moved by hand is a Fail, so the note says to mark it.
+- Each stage has one check that plays the stage, one check that types `getstage <QuestID>` in the console and says what number to expect, and a `note:` that names the console fix (`setstage <QuestID> <stage>`) for a stage that never starts. A stage you moved by hand is a Fail, so the note says to mark the check that plays that stage Fail on the page. The forced stage still writes its log line, but a mark set on the page wins over a Pass from the log.
 - The mod writes one `Debug.Trace` line for each stage change, and the plan's `log:` ids point at those lines. The rule file `examples\QuestExample.logrules.json` proves them, and its `order` rule proves that the stages came in the right order.
 - The Log checks group tells the tester to read the quest's stages in the save with `sf-save-reader quests <save> --data <Data folder> --filter <name> --details` (without `--data`, the quests have no names to filter on).
 

@@ -34,7 +34,8 @@ class QuestExampleTests(unittest.TestCase):
             rules = json.load(f)
         ids = {r["id"] for r in rules["expect"] + rules["forbid"]}
         with open(PLAN, encoding="utf-8") as f:
-            used = {line.split(":", 1)[1].strip() for line in f if line.strip().startswith("log:")}
+            used = {i.strip() for line in f if line.strip().startswith("log:")
+                    for i in line.split(":", 1)[1].split(",") if i.strip()}
         self.assertTrue(used)
         self.assertLessEqual(used, ids)
 
