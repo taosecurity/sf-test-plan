@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.1 (unreleased)
+## 0.4.1 (2026-11-25)
 
 This release adds an example plan for a quest mod. The program itself is unchanged.
 
