@@ -4,7 +4,8 @@
 
 ### What's new
 
-- `compare-builds` and `check-build` now compare every loose file in a zip that has a plugin, not only the plugins, archives and scripts. A changed SFSE DLL, `.ini` or interface file beside a plugin now counts as a difference, and the OK line says "the same plugins, scripts and other files". Documents (`.txt`, `.md`, `.pdf` and the like) are still ignored in such a zip.
+- `compare-builds` and `check-build` now compare every loose file in a zip that has a plugin, not only the plugins, archives and scripts. A changed SFSE DLL, `.ini` or interface file beside a plugin now counts as a difference, and the OK line says "the same plugins, scripts and other files". Documents (`.txt`, `.md`, `.pdf` and the like) are still ignored in such a zip. A `--pins` file accepts a DLL or other loose file the same way as a plugin, by its lower-case file name (such as `demo.dll`).
+- The sample JSON in the `--pins` error messages had one closing brace too many; it is now valid JSON.
 - `import` counts every plan check that has no mark as "not run", also the deep checks of a smoke round. Before, a smoke round whose deep checks were never marked said "0 not run".
 - `import` keeps the tester's mark or note over a log mark in the same marks file, as the page's Import button does. Before, it kept the newest mark whichever made it.
 - `check --rules --verbose` prints the rule-file line once instead of twice.

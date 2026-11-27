@@ -215,11 +215,11 @@ def _ba2_digests_in_zip(zf: zipfile.ZipFile, info: zipfile.ZipInfo) -> dict:
 
 # ---------------------------------------------------------------- pins
 def load_pins(path: str | None) -> dict:
-    """{plugin file name (lower case): (tested sha16, built sha16, why)} from a --pins file."""
+    """{file name without its folder (lower case): (tested sha16, built sha16, why)} from a --pins file."""
     if not path:
         return {}
     fix = f'Give a JSON file like {{"format": "{PINS_FORMAT}", "pins": {{"mymod.esm": {{"tested": "<16 hex>", ' \
-          '"built": "<16 hex>", "why": "<text>"}}}}.'
+          '"built": "<16 hex>", "why": "<text>"}}}.'
     try:
         with open(path, encoding="utf-8") as f:
             data = json.load(f)

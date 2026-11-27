@@ -1,7 +1,7 @@
 # AGENTS.md: sf-test-plan for AI assistants
 
 Plain steps for an AI assistant helping someone use sf-test-plan. Every command here was run once on sf-test-plan
-0.4.1 before release. The [README](README.md) has the full description and [FORMAT.md](FORMAT.md) the exact formats.
+0.5.0 before release. The [README](README.md) has the full description and [FORMAT.md](FORMAT.md) the exact formats.
 
 ## 1. What it is for
 
@@ -21,12 +21,12 @@ it for automated tests, and don't treat its results as proof a mod is safe: it r
 
 ## 3. Install
 
-Download `sf-test-plan-0.4.1.zip` from https://github.com/taosecurity/sf-test-plan/releases and check it against the
+Download `sf-test-plan-0.5.0.zip` from https://github.com/taosecurity/sf-test-plan/releases and check it against the
 `.sha256` file:
 
-    certutil -hashfile sf-test-plan-0.4.1.zip SHA256
+    certutil -hashfile sf-test-plan-0.5.0.zip SHA256
 
-On Linux or macOS: `sha256sum -c sf-test-plan-0.4.1.zip.sha256`. Unpack it anywhere. The commands below run from
+On Linux or macOS: `sha256sum -c sf-test-plan-0.5.0.zip.sha256`. Unpack it anywhere. The commands below run from
 the unpacked folder; `python -I sf_test_plan.py` works everywhere, `.\sf-test-plan.cmd` (Windows, with the `.\`) and
 `./sf-test-plan` (Linux, macOS) are short forms.
 
