@@ -117,10 +117,15 @@ def read_marks(path: str) -> dict:
 
 
 def _latest_by_id(marks: dict) -> dict[str, dict]:
-    """One mark per id; when an id appears twice, the newer "at" wins (the later entry wins a tie)."""
+    """One mark per id; when an id appears twice, the newer "at" wins (the later entry wins a tie),
+    except that a log mark never replaces a mark or note the tester set on the page."""
     best: dict[str, dict] = {}
     for c in marks.get("checks", []):
         old = best.get(c["id"])
+        # As on the page: a mark from the log never replaces the tester's own mark or note, however new it is.
+        if (old is not None and c.get("src") == "log" and old.get("src") != "log"
+                and (old.get("r") or old.get("n"))):
+            continue
         if old is None or (c.get("at") or "") >= (old.get("at") or ""):
             best[c["id"]] = c
     return best
@@ -136,10 +141,9 @@ def summarize(plan: Plan, marks: dict, today: str) -> dict:
     has_smoke = any(c.smoke for c in checks)
     deep_marked = any(by_id.get(c.id, {}).get("r") for c in checks if not c.smoke)
     smoke_round = has_smoke and not deep_marked
-    counted = [c for c in checks if c.smoke] if smoke_round else checks
     counts = {"pass": 0, "fail": 0, "skip": 0}
     not_run = 0
-    for c in counted:
+    for c in checks:   # a smoke round still counts the unmarked deep checks as not run
         r = by_id.get(c.id, {}).get("r", "")
         if r in counts:
             counts[r] += 1

@@ -120,15 +120,15 @@ The whole format, every warning and every file sf-test-plan reads or writes are 
 | `sf-test-plan rules PLAN [--out FILE] [--from FILE] [--prefix TEXT] [--plugin NAME] [--force]` | Writes a starter papyrus-log-check rule file with a rule for each `log:` id in the plan, or adds the missing ids to the rule file you already have. |
 | `sf-test-plan new PLAN [--mod NAME] [--force]` | Writes a starter plan. |
 | `sf-test-plan render PLAN [--fragment] [--out FILE] [--assets DIR] [--force]` | Writes the page, or with `--fragment` only the part a host page embeds. See "render" below. |
-| `sf-test-plan compare-builds TESTED BUILT [--pins FILE] [--json]` | Says whether two mod zips hold the same plugins and scripts. |
-| `sf-test-plan check-build PLAN --built ZIP [--tested ZIP] [--pins FILE] [--json]` | Says whether the plan's tested zip holds the same plugins and scripts as a new build. |
+| `sf-test-plan compare-builds TESTED BUILT [--pins FILE] [--json]` | Says whether two mod zips hold the same plugins, scripts and other files (such as an SFSE DLL). |
+| `sf-test-plan check-build PLAN --built ZIP [--tested ZIP] [--pins FILE] [--json]` | Says whether the plan's tested zip holds the same plugins, scripts and other files as a new build. |
 | `sf-test-plan ngplus --base FILE --order FILE --out FILE PLAN...` | Writes one shared New Game+ plan from several mods' plans. |
 
 Every command also takes `--verbose` and `--log FILE`. The exit codes are:
 
 | Exit code | Meaning |
 |---|---|
-| 0 | The command finished. Warnings are fine. `--help` always exits 0. For `compare-builds` and `check-build`, 0 also means the two zips have the same plugins and scripts. |
+| 0 | The command finished. Warnings are fine. `--help` always exits 0. For `compare-builds` and `check-build`, 0 also means the two zips have the same plugins, scripts and other files. |
 | 1 | The plan has errors (each one is printed with its line number and the fix). For `compare-builds` and `check-build`, 1 means the zips differ. |
 | 2 | A file can't be read or written, or an option is wrong. |
 
@@ -147,7 +147,7 @@ examples\Beacon.testplan.md: 3 groups, 6 checks, 5 smoke; 0 errors, 0 warnings
 
 `examples\QuestExample.testplan.md` is a plan for a made-up quest mod, Tidewater Errand, whose quest has three stages. It shows how to test a quest honestly:
 
-- Each stage has one check that plays the stage, one check that types `getstage <QuestID>` in the console and says what number to expect, and a `note:` that names the console fix (`setstage <QuestID> <stage>`) for a stage that never starts. A stage you moved by hand is a Fail, so the note says to mark the check that plays that stage Fail on the page. The forced stage still writes its log line, so the plan says to bring the log's marks in with the page's Import button, where a mark set on the page wins over a Pass from the log. (`sf-test-plan import` keeps the newest mark, whichever made it.)
+- Each stage has one check that plays the stage, one check that types `getstage <QuestID>` in the console and says what number to expect, and a `note:` that names the console fix (`setstage <QuestID> <stage>`) for a stage that never starts. A stage you moved by hand is a Fail, so the note says to mark the check that plays that stage Fail on the page. The forced stage still writes its log line, so the plan says to bring the log's marks in with the page's Import button, where a mark set on the page wins over a Pass from the log. (`sf-test-plan import` does the same: a log mark never replaces a mark or note the tester made on the page.)
 - The mod writes one `Debug.Trace` line for each stage change, and the plan's `log:` ids point at those lines. The rule file `examples\QuestExample.logrules.json` proves them, and its `order` rule proves that the stages came in the right order.
 - The Log checks group tells the tester to read the quest's stages in the save with `sf-save-reader quests <save> --data <Data folder> --filter <name> --details` (without `--data`, the quests have no names to filter on).
 
@@ -164,7 +164,7 @@ After a test round, add the marks file the tester exported to the plan's results
 
 ```
 > sf-test-plan import marks-beacon.json --plan examples\Beacon.testplan.md
-Smoke test: 2 pass, 1 fail, 1 skip, 1 not run
+Smoke test: 2 pass, 1 fail, 1 skip, 2 not run
 1.2 fail: No Beacon group in Gameplay options.; 2.1 pass: Took two tries.; 3.1: Ran out of time.
 Results: examples\Beacon.testplan.results.json (rebuild the page to show it)
 ```
@@ -278,7 +278,7 @@ DIFFERENT: 1 of 1 files differ.
 > sf-test-plan compare-builds BeaconMod-0.1.0.zip BeaconMod-0.1.1.zip --pins pins.json
 BeaconMod.esm: pinned: rebuilt with the same content
 WARNING: BeaconMod.esm differs, but the --pins file allows this exact pair: rebuilt with the same content
-OK: the built zip has the same plugins and scripts as the tested zip.
+OK: the built zip has the same plugins, scripts and other files as the tested zip.
 ```
 
 `check-build` does the same with the zip named by the plan's `zip:` line (relative to the plan's folder, or give `--tested`) and a new build given with `--built`:
@@ -353,8 +353,8 @@ FORMAT.md section 7 lists every key.
 ## The page
 
 - **Pass / Fail / Skip** on each step, and a note box. Click a chosen mark again to clear it.
-- The tally at the top counts pass, fail, skip and not run. With a smoke test, only the smoke checks count until you mark a deep check. From then on the tally covers every check, and `import` calls the round a "Full test".
-- **Export** downloads your marks as `<run>-marks-<date>.json`. **Import** reads one back (a tester's file, or one from `sf-test-plan logs`). For each step the newer mark wins, but a mark from the log never replaces one you made yourself.
+- The tally at the top counts pass, fail, skip and not run. With a smoke test, only the smoke checks count on the page until you mark a deep check. From then on the tally covers every check, and `import` calls the round a "Full test". `import` always counts every plan check that has no mark as not run, so a smoke round whose deep checks were never marked says so in its row.
+- **Export** downloads your marks as `<run>-marks-<date>.json`. **Import** reads one back (a tester's file, or one from `sf-test-plan logs`). For each step the newer mark wins, but a mark from the log never replaces a mark or note you made yourself. `sf-test-plan import` follows the same rule when a marks file holds both.
 - **Copy results** puts a plain-text summary on the clipboard, ready to paste into a bug report or a Nexus post.
 - **Reset** clears the marks and notes on this page's steps in this browser. Marks that another build of the plan saved for steps this page doesn't have are kept, and the page says how many.
 - Marks are kept in the browser's local storage for that page. A private window, or a browser that blocks storage, keeps them only until you close the tab. The page says so, so use Export before you close it.

@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.5.0 (unreleased)
+
+### What's new
+
+- `compare-builds` and `check-build` now compare every loose file in a zip that has a plugin, not only the plugins, archives and scripts. A changed SFSE DLL, `.ini` or interface file beside a plugin now counts as a difference, and the OK line says "the same plugins, scripts and other files". Documents (`.txt`, `.md`, `.pdf` and the like) are still ignored in such a zip.
+- `import` counts every plan check that has no mark as "not run", also the deep checks of a smoke round. Before, a smoke round whose deep checks were never marked said "0 not run".
+- `import` keeps the tester's mark or note over a log mark in the same marks file, as the page's Import button does. Before, it kept the newest mark whichever made it.
+- `check --rules --verbose` prints the rule-file line once instead of twice.
+- The quest example's check texts and rule file are tidied (stage checks point to the Log checks section, and the script rule is anchored).
+
+### Example
+
+    > sf-test-plan compare-builds Demo-0.1.0.zip Demo-0.1.1.zip
+    Data/Demo.esm: same
+    Data/SFSE/Plugins/Demo.dll: differs: the tested zip's copy has sha256 2d27fbdf4e8ca207, and the built zip's copy has 81db67b6a5702b9b
+    DIFFERENT: 1 of 2 files differ.
+
 ## 0.4.1 (2026-11-25)
 
 This release adds an example plan for a quest mod. The program itself is unchanged.

@@ -141,9 +141,9 @@ Written by the page's Export button and by `sf-test-plan logs`. Read by `import`
 }
 ```
 
-- `r` is `pass`, `fail`, `skip` or `""` (no mark, only a note). `n` is the note, `t` the step text (plain, at most 300 characters), `g` the group number, `at` an ISO 8601 UTC time, `src` `page` or `log` (where the mark came from). Optional `ns: "page"` says the note was typed by a person; the page's Import reads it, so a later log import keeps that note even when the mark came from the log. `sf-test-plan import` ignores it (every note goes into the results notes).
+- `r` is `pass`, `fail`, `skip` or `""` (no mark, only a note). `n` is the note, `t` the step text (plain, at most 300 characters), `g` the group number, `at` an ISO 8601 UTC time, `src` `page` or `log` (where the mark came from). Optional `ns: "page"` says the note was typed by a person; the page's Import reads it, so a later log import keeps that note even when the mark came from the log. `sf-test-plan import` ignores it: when one id appears twice in the file, the newer `at` wins, except that a log mark (`src: "log"`) never replaces an earlier entry that has a mark or note and isn't a log mark (every note goes into the results notes).
 - A reader must refuse a different major format (`sf-test-plan-marks/2`), and must ignore unknown fields.
-- When the page imports a file whose `run` differs from its own, it asks before merging. Merging goes by `id`: the newer `at` wins.
+- When the page imports a file whose `run` differs from its own, it asks before merging. Merging goes by `id`: the newer `at` wins, except that a log mark never replaces a mark the tester set on the page.
 
 ## 4. Results file (`<plan>.results.json`)
 
@@ -159,7 +159,7 @@ Written next to the plan by `import`. Newest round first. `build` shows it as th
 }
 ```
 
-`date`, `test`, `happened` and `notes` match the private kit's results.json rows, so either tool can read them.
+`happened` counts every plan check: a check with no mark is "not run", also a deep check in a smoke round (`test` is "Smoke test" until a deep check is marked, then "Full test"). `date`, `test`, `happened` and `notes` match the private kit's results.json rows, so either tool can read them.
 
 ## 5. papyrus-log-check input (`logs`)
 

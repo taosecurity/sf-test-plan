@@ -228,6 +228,29 @@ class BuildsTests(unittest.TestCase):
         self.assertIn("DIFFERENT: 1 of 1 files differ.", self.compare(a, b)[1])
         self.assertIn("OK: the built zip has the same files as the tested zip.", self.compare(a, a)[1])
 
+    # ---- loose files next to a plugin (0.5.0)
+    def test_dll_beside_plugin_differs(self):
+        a = self.zip("a.zip", {"Data/Mod.esm": b"E", "Data/SFSE/Plugins/X.dll": b"D1"})
+        b = self.zip("b.zip", {"Data/Mod.esm": b"E", "Data/SFSE/Plugins/X.dll": b"D2"})
+        code, out, _ = self.compare(a, b)
+        self.assertEqual(code, 1, out)
+        self.assertIn("Data/SFSE/Plugins/X.dll: differs", out)
+        self.assertIn("DIFFERENT: 1 of 2 files differ.", out)
+
+    def test_loose_file_beside_plugin_only_in_one(self):
+        a = self.zip("a.zip", {"Data/Mod.esm": b"E"})
+        b = self.zip("b.zip", {"Data/Mod.esm": b"E", "Data/SFSE/Plugins/X.ini": b"i"})
+        code, out, _ = self.compare(a, b)
+        self.assertEqual(code, 1, out)
+        self.assertIn("X.ini: only in built", out)
+
+    def test_same_files_beside_plugin_ok(self):
+        files = {"Data/Mod.esm": b"E", "Data/SFSE/Plugins/X.dll": b"D1", "readme.txt": b"r"}
+        a, b = self.zip("a.zip", files), self.zip("b.zip", dict(files, **{"readme.txt": b"new", "CHANGES.md": b"c"}))
+        code, out, _ = self.compare(a, b)
+        self.assertEqual(code, 0, out)
+        self.assertIn("X.dll: same", out)
+
     # ---- loose scripts next to a plugin
     def test_loose_script_change_differs(self):
         a = self.zip("a.zip", {"Data/Mod.esm": b"E", "Data/Scripts/ModQuest.pex": pex(b"body one", 1)})
@@ -242,7 +265,7 @@ class BuildsTests(unittest.TestCase):
         b = self.zip("b.zip", {"Data/Mod.esm": b"E", "Data/Scripts/ModQuest.pex": pex(b"body", 999)})
         code, out, _ = self.compare(a, b)
         self.assertEqual(code, 0, out)
-        self.assertIn("OK: the built zip has the same plugins and scripts as the tested zip.", out)
+        self.assertIn("OK: the built zip has the same plugins, scripts and other files as the tested zip.", out)
 
     def test_loose_script_only_in_one(self):
         a = self.zip("a.zip", {"Data/Mod.esm": b"E"})

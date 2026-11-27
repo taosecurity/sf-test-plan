@@ -487,11 +487,11 @@ def load_rule_file(rules_path: str) -> dict:
     if not isinstance(data, dict):
         raise SetupError(f"{rules_path} isn't a papyrus-log-check rule file: it should be a JSON object "
                          "with 'expect' and 'forbid' lists.")
-    rule_ids_of(data, rules_path)   # checks the shape
+    rule_ids_of(data, rules_path, quiet=True)   # checks the shape; the caller's own call says what was read
     return data
 
 
-def rule_ids_of(data: dict, rules_path: str) -> set[str]:
+def rule_ids_of(data: dict, rules_path: str, quiet: bool = False) -> set[str]:
     """The expect and forbid ids of a rule file object. Raises SetupError when a list has the wrong shape."""
     ids: set[str] = set()
     for kind in ("expect", "forbid"):
@@ -501,5 +501,6 @@ def rule_ids_of(data: dict, rules_path: str) -> set[str]:
         for r in rules:
             if isinstance(r, dict) and isinstance(r.get("id"), str) and r["id"]:
                 ids.add(r["id"])
-    log.debug("rule file %s: %d ids (%s)", rules_path, len(ids), ", ".join(sorted(ids)))
+    if not quiet:
+        log.debug("rule file %s: %d ids (%s)", rules_path, len(ids), ", ".join(sorted(ids)))
     return ids

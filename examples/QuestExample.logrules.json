@@ -3,7 +3,7 @@
  "version": "0.1.0",
  "plugins": ["TidewaterErrand.esm"],
  "prefix": "\\[TWE\\]",
- "scripts": "^TWE:|\\bTWE:",
+ "scripts": "^TWE:",
  "expect": [
   {"id": "started", "re": "\\[TWE\\] started, version {version}", "always": true, "show": "[TWE] started, version …", "means": "The quest script writes this line at every new game and every load. If it is missing, the quest never ran."},
   {"id": "stage-10", "re": "\\[TWE\\] stage 10: quest started", "show": "[TWE] stage 10: quest started", "means": "Stage 10 was set when the player first reached a spaceport."},

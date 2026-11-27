@@ -230,7 +230,7 @@ class CommandTests(unittest.TestCase):
         marks = {"run": "lantern-0.1.0", "checks": [{"id": "L.1", "r": "fail", "n": "", "at": ""},
                                                     {"id": "1.1", "r": "pass", "n": "", "at": ""}]}
         row = results.summarize(p, marks, "2026-11-23")
-        self.assertEqual(row["happened"], "1 pass, 0 fail, 0 skip, 0 not run")
+        self.assertEqual(row["happened"], "1 pass, 0 fail, 0 skip, 1 not run")
 
 
 if __name__ == "__main__":

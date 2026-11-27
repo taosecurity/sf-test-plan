@@ -687,7 +687,7 @@ def build_parser() -> argparse.ArgumentParser:
     pins_help = ("JSON file (format sf-test-plan-pins/1) of known, accepted differences: a plugin whose two sha256 "
                  "values match its pin exactly is a warning, not a difference")
     cb = sub.add_parser("compare-builds", parents=[common],
-                        help="check that two mod zips have the same plugins and scripts (exit 0 same, 1 different)")
+                        help="check that two mod zips have the same plugins, scripts and other files (exit 0 same, 1 different)")
     cb.add_argument("tested", help="the zip that was tested")
     cb.add_argument("built", help="the zip of the current build")
     cb.add_argument("--pins", metavar="FILE", help=pins_help)
@@ -695,7 +695,7 @@ def build_parser() -> argparse.ArgumentParser:
     cb.set_defaults(func=cmd_compare_builds)
 
     ck = sub.add_parser("check-build", parents=[common],
-                        help="check that the plan's tested zip has the same plugins and scripts as a new build")
+                        help="check that the plan's tested zip has the same plugins, scripts and other files as a new build")
     ck.add_argument("plan")
     ck.add_argument("--built", required=True, metavar="ZIP", help="the zip of the current build")
     ck.add_argument("--tested", metavar="ZIP",

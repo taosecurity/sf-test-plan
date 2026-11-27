@@ -35,7 +35,7 @@ This plan tests Tidewater Errand 0.1.0, a made-up example quest mod. The quest h
   log: stage-20
 - [ ] Type `getstage TWE_Quest` in the console.
   Expect: 20.
-  note: If reading the letter doesn't start stage 20, type `setstage TWE_Quest 20` to go on, and mark check 3.1 Fail on the page.
+  note: If reading the letter doesn't start stage 20, type `setstage TWE_Quest 20` to go on, and mark check 3.1 Fail on the page with a note of where you were. The forced stage still writes its log line, so read the Log checks section before you bring in the log's marks.
 
 ## 4 Stage 30: finish the quest
 - [ ] Save now, at stage 20, then quit to the main menu and load the save.
@@ -47,7 +47,7 @@ This plan tests Tidewater Errand 0.1.0, a made-up example quest mod. The quest h
   log: stage-30
 - [ ] Type `getstage TWE_Quest` in the console.
   Expect: 30.
-  note: If holding 3 Copper doesn't finish the quest, type `setstage TWE_Quest 30` to go on, and mark check 4.2 Fail on the page.
+  note: If holding 3 Copper doesn't finish the quest, type `setstage TWE_Quest 30` to go on, and mark check 4.2 Fail on the page with a note of where you were. The forced stage still writes its log line, so read the Log checks section before you bring in the log's marks.
 
 ## 5 Edge cases
 - [ ] On a second new character, pick up 3 Copper before your first spaceport, then land at a spaceport and read the letter.
@@ -55,16 +55,16 @@ This plan tests Tidewater Errand 0.1.0, a made-up example quest mod. The quest h
   note: No `log:` id here: the stage 30 line from your first character would pass this check without testing it.
 
 ## Log checks
-After groups 1 to 4, and before the edge cases (a game restart starts a new log), run papyrus-log-check on the Papyrus log with the rule file `QuestExample.logrules.json`. Its `order` rule proves that the stages came in the right order. To see the quest's stages in a save, run `sf-save-reader quests <save> --data <Data folder> --filter Tidewater --details` (the `--data` folder gives the quest its name).
+After groups 1 to 4, and before the edge cases (so the second character's lines don't mix into the report), run papyrus-log-check on the Papyrus log with the rule file `QuestExample.logrules.json`. Its `order` rule proves that the stages came in the right order. To see the quest's stages in a save, run `sf-save-reader quests <save> --data <Data folder> --filter Tidewater --details` (the `--data` folder gives the quest its name).
 
-`sf-test-plan logs` turns the report into a marks file. Bring it in with the page's Import button: there a mark you set on the page wins over a Pass from the log, so a stage you forced with `setstage` stays a Fail. `sf-test-plan import` keeps the newest mark instead, so use it only when you forced no stage. The checks below have no Pass or Fail button on the page; the report shows their results.
+`sf-test-plan logs` turns the report into a marks file. Bring it in with the page's Import button, or with `sf-test-plan import`: in both, a mark you set on the page wins over a Pass from the log, so a stage you forced with `setstage` stays a Fail. The checks below have no Pass or Fail button on the page; the report shows their results.
 
 - [ ] The quest script started at the beginning of the game.
   Expect: a `[TWE] started, version 0.1.0` line.
   log: started
 - [ ] The stages came in order: 10, then 20, then 30.
   Expect: the three `[TWE] stage` lines appear in that order, and the report's line `order started > stage-10 > stage-20 > stage-30` says PASS and "in order".
-  note: An order rule has no id of its own, so `sf-test-plan logs` doesn't report on it. If the order line says FAIL, mark check 4.2 Fail on the page and copy the order line into its note.
+  note: An order rule has no id of its own, so `sf-test-plan logs` doesn't report on it. If the order line says FAIL, mark Fail the check of the stage that came out of order and copy the order line into its note.
 - [ ] No stage was set before the stage that must come first.
   Expect: no `[TWE] WARNING: stage ... set before stage ...` line. A console `setstage` that skips ahead writes one.
   log: no-skipped-stage

@@ -110,7 +110,7 @@ class SummarizeTests(unittest.TestCase):
         plan.groups = plan.groups[:3]
         row = results.summarize(plan, results.read_marks(fx("marks-beacon.json")), "2026-11-19")
         self.assertEqual(row["test"], "Smoke test")
-        self.assertEqual(row["happened"], "2 pass, 1 fail, 1 skip, 1 not run")
+        self.assertEqual(row["happened"], "2 pass, 1 fail, 1 skip, 2 not run")
         self.assertEqual(row["date"], "2026-11-19")
         self.assertEqual(row["run"], "beacon-0.1.0")
         self.assertEqual(row["notes"], "1.2 fail: No Beacon group in Gameplay options.; "

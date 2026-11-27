@@ -3,7 +3,7 @@
 Read only. Plugin entries (.esm, .esp, .esl, .ba2) are compared by CRC-32 and size first. A .ba2 that differs is
 copied, one at a time, to a temporary file and opened: each file inside is compared by its unpacked content, and a
 .pex script is compared by meaning (pex.listing: compile time and string-table order ignored), so a recompile of the
-same source still matches. A loose .pex next to a plugin is compared the same way. A script that listing() can't read is compared by its bytes with the compile time zeroed. When neither zip has a plugin (a DLL-only zip), every file entry is compared instead.
+same source still matches. A loose .pex is compared the same way. A script that listing() can't read is compared by its bytes with the compile time zeroed. Every other file entry (an SFSE DLL, an .ini, an interface file) is compared by CRC-32, size and sha256, except documents (.txt, .md, .pdf and the like) in a zip that has a plugin.
 """
 from __future__ import annotations
 
@@ -25,6 +25,7 @@ from .model import SetupError
 log = logging.getLogger("sf-test-plan")
 
 PLUGIN_EXTS = (".esm", ".esp", ".esl", ".ba2")
+DOC_EXTS = (".txt", ".md", ".rtf", ".pdf", ".url", ".html", ".htm", ".docx")   # ignored beside a plugin
 PINS_FORMAT = "sf-test-plan-pins/1"
 COMPARE_FORMAT = "sf-test-plan-compare/1"
 _SHA16 = re.compile(r"[0-9a-f]{16}")
@@ -49,7 +50,7 @@ def _open_zip(path: str, which: str) -> zipfile.ZipFile:
 
 def zip_entries(zf: zipfile.ZipFile, every_file: bool = False) -> dict:
     """{name (lower case, forward slashes): ZipInfo} for the plugin entries and loose .pex scripts (every file
-    entry with every_file)."""
+    entry with every_file, which compare-builds always passes)."""
     out = {}
     for info in zf.infolist():
         name = info.filename.replace("\\", "/")
@@ -256,13 +257,15 @@ def compare(tested: str, built: str, pins: dict | None = None) -> dict:
 def _compare(tested: str, built: str, pins: dict) -> dict:
     problems, warnings, entries = [], [], []
     with _open_zip(tested, "tested") as za, _open_zip(built, "built") as zb:
-        a, b = zip_entries(za), zip_entries(zb)
+        a, b = zip_entries(za, True), zip_entries(zb, True)   # every file: plugins, scripts, DLLs and the rest
         every_file = not _has_plugin(a) and not _has_plugin(b)
         if every_file:
             log.debug("no plugin files in either zip: comparing every file")
-            a, b = zip_entries(za, True), zip_entries(zb, True)
             if not a and not b:
                 problems.append("Both zips are empty, so there is nothing to compare.")
+        else:   # a zip with a plugin: documents (readme, changelog) may change between builds, everything else may not
+            a = {k: v for k, v in a.items() if not k.endswith(DOC_EXTS)}
+            b = {k: v for k, v in b.items() if not k.endswith(DOC_EXTS)}
 
         def add(name, status, detail=""):
             entries.append({"name": name, "status": status, "detail": detail})
@@ -318,7 +321,7 @@ def _compare(tested: str, built: str, pins: dict) -> dict:
 
 
 def ok_line(result: dict) -> str:
-    what = "files" if result.get("every_file") else "plugins and scripts"
+    what = "files" if result.get("every_file") else "plugins, scripts and other files"
     return f"OK: the built zip has the same {what} as the tested zip."
 
 
