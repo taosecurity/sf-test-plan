@@ -59,7 +59,9 @@ It prints `examples/Beacon.testplan.md: 3 groups, 6 checks, 5 smoke; 0 errors, 0
 
       python -I sf_test_plan.py logs out/logcheck-20261120-213000.json --plan MyMod.testplan.md
 
-  It writes `out/logcheck-20261120-213000.marks.json`. Import that on the page, or with `import`.
+  It writes `out/logcheck-20261120-213000.marks.json`. Import that on the page, then Export and give that file to
+  `import`. Don't give the logs file to `import` on its own: it holds none of the tester's page marks, so a log
+  Pass would stand over a tester's Fail and every check without a `log:` id would count as not run.
 
 - Start a papyrus-log-check rule file from the plan's `log:` ids (writes `MyMod.logrules.json` next to the plan,
   one `expect` rule per id; it refuses to replace a file without `--force`):

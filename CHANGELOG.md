@@ -9,6 +9,7 @@
 - `import` counts every plan check that has no mark as "not run", also the deep checks of a smoke round. Before, a smoke round whose deep checks were never marked said "0 not run".
 - `import` keeps the tester's mark or note over a log mark in the same marks file, as the page's Import button does. Before, it kept the newest mark whichever made it.
 - `check --rules --verbose` prints the rule-file line once instead of twice.
+- `logs`, the README and AGENTS.md now say to Import its marks file on the page, then Export and give that file to `import`. Before, they also offered `import` on the logs file alone, which holds none of the tester's page marks.
 - The quest example's check texts and rule file are tidied (stage checks point to the Log checks section, the order check names the check to mark Fail, and the script rule is the simpler `\bTWE:`, which still matches the quest's scripts in error messages and stack frames).
 
 ### Example

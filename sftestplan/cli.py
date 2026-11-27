@@ -244,7 +244,8 @@ def cmd_logs(args) -> int:
             json.dump(marks, f, indent=1)
     except OSError as e:
         raise SetupError(f"can't write {out}: {e.strerror}. Pick another --out.")
-    print(f"Marks: {out} (open the page and use Import, or run: sf-test-plan import {_q(out)} --plan {_q(args.plan)})")
+    print(f"Marks: {out} (open the page and use Import, then Export and give that file to: "
+          f"sf-test-plan import <export> --plan {_q(args.plan)})")
     return 0
 
 

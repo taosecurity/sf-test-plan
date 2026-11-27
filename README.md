@@ -116,7 +116,7 @@ The whole format, every warning and every file sf-test-plan reads or writes are 
 | `sf-test-plan build PLAN [--out PAGE] [--rules FILE] [--style FILE]` | Checks the plan and writes the page (default: the plan's name with `.html`). |
 | `sf-test-plan check PLAN [--rules FILE] [--style FILE]` | Checks the plan for mistakes without writing anything. With `--rules`, it also checks every `log:` id against a papyrus-log-check rule file. With `--style`, it also checks your own writing rules. |
 | `sf-test-plan import MARKS --plan PLAN` | Adds a marks file (from the page's Export button) to `<plan>.results.json` as one results row, and prints the tally. Build again to show it on the page. |
-| `sf-test-plan logs REPORT --plan PLAN [--mod NAME] [--out MARKS]` | Reads a papyrus-log-check JSON report and writes marks for the steps with `log:` ids. Import them on the page, or with `import`. |
+| `sf-test-plan logs REPORT --plan PLAN [--mod NAME] [--out MARKS]` | Reads a papyrus-log-check JSON report and writes marks for the steps with `log:` ids. Import them on the page, then Export and give that file to `import` (the marks file alone holds none of the page's marks). |
 | `sf-test-plan rules PLAN [--out FILE] [--from FILE] [--prefix TEXT] [--plugin NAME] [--force]` | Writes a starter papyrus-log-check rule file with a rule for each `log:` id in the plan, or adds the missing ids to the rule file you already have. |
 | `sf-test-plan new PLAN [--mod NAME] [--force]` | Writes a starter plan. |
 | `sf-test-plan render PLAN [--fragment] [--out FILE] [--assets DIR] [--force]` | Writes the page, or with `--fragment` only the part a host page embeds. See "render" below. |
@@ -179,7 +179,7 @@ Using 'Beacon Mod' from the report (the plan's mod: line).
 1.1 pass: loaded PASS.
 2.2 FAIL: placed FAIL.
 3.1 no mark: not proved: restored NOT SEEN.
-Marks: logcheck-beacon.marks.json (open the page and use Import, or run: sf-test-plan import logcheck-beacon.marks.json --plan examples\Beacon.testplan.md)
+Marks: logcheck-beacon.marks.json (open the page and use Import, then Export and give that file to: sf-test-plan import <export> --plan examples\Beacon.testplan.md)
 ```
 
 See "Papyrus logs" below for how to make the report.
