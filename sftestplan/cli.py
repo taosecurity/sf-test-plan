@@ -684,8 +684,9 @@ def build_parser() -> argparse.ArgumentParser:
     n.add_argument("--force", action="store_true", help="replace an existing file")
     n.set_defaults(func=cmd_new)
 
-    pins_help = ("JSON file (format sf-test-plan-pins/1) of known, accepted differences: a plugin whose two sha256 "
-                 "values match its pin exactly is a warning, not a difference")
+    pins_help = ("JSON file (format sf-test-plan-pins/1) of known, accepted differences, keyed by lower-case file "
+                 "name (a plugin, DLL or other file): a file whose two sha256 values match its pin exactly is a "
+                 "warning, not a difference")
     cb = sub.add_parser("compare-builds", parents=[common],
                         help="check that two mod zips have the same plugins, scripts and other files (exit 0 same, 1 different)")
     cb.add_argument("tested", help="the zip that was tested")

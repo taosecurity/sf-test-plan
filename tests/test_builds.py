@@ -251,6 +251,23 @@ class BuildsTests(unittest.TestCase):
         self.assertEqual(code, 0, out)
         self.assertIn("X.dll: same", out)
 
+    def test_packaging_files_beside_plugin_ignored(self):
+        # A release bumps the fomod version, refreshes its picture and license; the mod itself is the same.
+        files = {"Data/Mod.esm": b"E", "Data/SFSE/Plugins/X.dll": b"D1", "fomod/info.xml": b"<Version>0.1.0</Version>",
+                 "fomod/images/cover.png": b"p1", "LICENSE": b"l1", "Screenshot.jpg": b"j1"}
+        a = self.zip("a.zip", files)
+        b = self.zip("b.zip", dict(files, **{"fomod/info.xml": b"<Version>1.0.0</Version>",
+                                            "fomod/images/cover.png": b"p2", "LICENSE": b"l2", "Screenshot.jpg": b"j2",
+                                            "__MACOSX/Data/._Mod.esm": b"x", "Data/Thumbs.db": b"t"}))
+        code, out, _ = self.compare(a, b)
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("fomod", out)
+        b2 = self.zip("b2.zip", dict(files, **{"fomod/info.xml": b"<Version>1.0.0</Version>",
+                                              "Data/SFSE/Plugins/X.dll": b"D2"}))
+        code, out, _ = self.compare(a, b2)
+        self.assertEqual(code, 1, out)   # the DLL still counts
+        self.assertIn("DIFFERENT: 1 of 2 files differ.", out)
+
     # ---- loose scripts next to a plugin
     def test_loose_script_change_differs(self):
         a = self.zip("a.zip", {"Data/Mod.esm": b"E", "Data/Scripts/ModQuest.pex": pex(b"body one", 1)})

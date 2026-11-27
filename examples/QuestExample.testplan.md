@@ -57,7 +57,7 @@ This plan tests Tidewater Errand 0.1.0, a made-up example quest mod. The quest h
 ## Log checks
 After groups 1 to 4, and before the edge cases (so the second character's lines don't mix into the report), run papyrus-log-check on the Papyrus log with the rule file `QuestExample.logrules.json`. Its `order` rule proves that the stages came in the right order. To see the quest's stages in a save, run `sf-save-reader quests <save> --data <Data folder> --filter Tidewater --details` (the `--data` folder gives the quest its name).
 
-`sf-test-plan logs` turns the report into a marks file. Bring it in with the page's Import button, or with `sf-test-plan import`: in both, a mark you set on the page wins over a Pass from the log, so a stage you forced with `setstage` stays a Fail. The checks below have no Pass or Fail button on the page; the report shows their results.
+`sf-test-plan logs` turns the report into a marks file. Bring it in with the page's Import button, where a mark you set on the page wins over a Pass from the log, so a stage you forced with `setstage` stays a Fail. Then use Export, and give that file to `sf-test-plan import` for the results row. The file from `sf-test-plan logs` doesn't hold your page marks, so don't give it to `sf-test-plan import` on its own. The checks below have no Pass or Fail button on the page; the report shows their results.
 
 - [ ] The quest script started at the beginning of the game.
   Expect: a `[TWE] started, version 0.1.0` line.

@@ -50,7 +50,7 @@ class LogNeverReplacesPageMark(unittest.TestCase):
         self.assertIn("1 fail", row["happened"])
         self.assertIn("1.1 fail: forced stage", row["notes"])
 
-    def test_log_mark_listed_first_does_not_win_either(self):
+    def test_older_page_mark_listed_after_a_log_mark_goes_by_time(self):
         plan = parse.parse_text(PLAN)
         row = results.summarize(plan, marks(
             {"id": "1.1", "r": "pass", "at": "2026-11-27T11:00:00Z", "src": "log"},

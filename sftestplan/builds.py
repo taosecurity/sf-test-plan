@@ -3,7 +3,8 @@
 Read only. Plugin entries (.esm, .esp, .esl, .ba2) are compared by CRC-32 and size first. A .ba2 that differs is
 copied, one at a time, to a temporary file and opened: each file inside is compared by its unpacked content, and a
 .pex script is compared by meaning (pex.listing: compile time and string-table order ignored), so a recompile of the
-same source still matches. A loose .pex is compared the same way. A script that listing() can't read is compared by its bytes with the compile time zeroed. Every other file entry (an SFSE DLL, an .ini, an interface file) is compared by CRC-32, size and sha256, except documents (.txt, .md, .pdf and the like) in a zip that has a plugin.
+same source still matches. A loose .pex is compared the same way. A script that listing() can't read is compared by its bytes with the compile time zeroed. Every other file entry (an SFSE DLL, an .ini, an interface file) is compared by CRC-32, size and sha256, except, in a zip that has a plugin, documents (.txt, .md, .pdf and the like), pictures (.png, .jpg), a fomod
+folder, extensionless readme and license files and OS junk (__MACOSX, Thumbs.db).
 """
 from __future__ import annotations
 
@@ -25,7 +26,12 @@ from .model import SetupError
 log = logging.getLogger("sf-test-plan")
 
 PLUGIN_EXTS = (".esm", ".esp", ".esl", ".ba2")
-DOC_EXTS = (".txt", ".md", ".rtf", ".pdf", ".url", ".html", ".htm", ".docx")   # ignored beside a plugin
+# Beside a plugin these may change between builds without changing the mod: documents, pictures, a fomod
+# installer folder, extensionless readme and license files, and the junk files macOS and Windows add.
+DOC_EXTS = (".txt", ".md", ".rtf", ".pdf", ".url", ".html", ".htm", ".docx",
+            ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp")
+_DOC_NAMES = {"readme", "license", "licence", "changelog", "changes", "credits", "copying", "authors",
+              "thumbs.db", "desktop.ini", ".ds_store"}
 PINS_FORMAT = "sf-test-plan-pins/1"
 COMPARE_FORMAT = "sf-test-plan-compare/1"
 _SHA16 = re.compile(r"[0-9a-f]{16}")
@@ -58,6 +64,13 @@ def zip_entries(zf: zipfile.ZipFile, every_file: bool = False) -> dict:
             continue
         out[name.lower()] = info
     return out
+
+
+def _is_packaging(key: str) -> bool:
+    """A document, picture, fomod or OS junk entry (key: lower case, forward slashes), ignored beside a plugin."""
+    parts = key.split("/")
+    return (key.endswith(DOC_EXTS) or parts[-1] in _DOC_NAMES or "fomod" in parts[:-1]
+            or parts[0] == "__macosx")
 
 
 def _has_plugin(entries: dict) -> bool:
@@ -263,9 +276,10 @@ def _compare(tested: str, built: str, pins: dict) -> dict:
             log.debug("no plugin files in either zip: comparing every file")
             if not a and not b:
                 problems.append("Both zips are empty, so there is nothing to compare.")
-        else:   # a zip with a plugin: documents (readme, changelog) may change between builds, everything else may not
-            a = {k: v for k, v in a.items() if not k.endswith(DOC_EXTS)}
-            b = {k: v for k, v in b.items() if not k.endswith(DOC_EXTS)}
+        else:   # a zip with a plugin: documents, pictures and a fomod folder may change between builds, the rest may not
+            a = {k: v for k, v in a.items() if not _is_packaging(k)}
+            b = {k: v for k, v in b.items() if not _is_packaging(k)}
+            log.debug("comparing %d and %d files (documents, pictures and fomod files left out)", len(a), len(b))
 
         def add(name, status, detail=""):
             entries.append({"name": name, "status": status, "detail": detail})
