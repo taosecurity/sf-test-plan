@@ -60,7 +60,7 @@ def zip_entries(zf: zipfile.ZipFile, every_file: bool = False) -> dict:
     out = {}
     for info in zf.infolist():
         name = info.filename.replace("\\", "/")
-        if info.is_dir() or not (every_file or name.lower().endswith(PLUGIN_EXTS + (".pex",))):
+        if info.is_dir() or name.endswith("/") or not (every_file or name.lower().endswith(PLUGIN_EXTS + (".pex",))):
             continue
         out[name.lower()] = info
     return out
@@ -251,7 +251,8 @@ def load_pins(path: str | None) -> dict:
         if not ok or not _SHA16.fullmatch(pin["tested"].lower()) or not _SHA16.fullmatch(pin["built"].lower()):
             raise SetupError(f"the --pins file {path} has a bad pin for {name!r}: it needs \"tested\" and \"built\" "
                              f"(16 hex digits each, the start of the file's sha256) and \"why\" (text). {fix}")
-        out[name.lower()] = (pin["tested"].lower(), pin["built"].lower(), pin["why"])
+        key = name.replace("\\", "/").rsplit("/", 1)[-1].lower()   # a key copied with its folder works too
+        out[key] = (pin["tested"].lower(), pin["built"].lower(), pin["why"])
     return out
 
 

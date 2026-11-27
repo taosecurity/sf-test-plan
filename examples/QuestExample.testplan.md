@@ -64,7 +64,7 @@ After groups 1 to 4, and before the edge cases (so the second character's lines 
   log: started
 - [ ] The stages came in order: 10, then 20, then 30.
   Expect: the three `[TWE] stage` lines appear in that order, and the report's line `order started > stage-10 > stage-20 > stage-30` says PASS and "in order".
-  note: An order rule has no id of its own, so `sf-test-plan logs` doesn't report on it. If the order line says FAIL, mark Fail the check of the stage that came out of order and copy the order line into its note.
+  note: An order rule has no id of its own, so `sf-test-plan logs` doesn't report on it. If the order line says FAIL, find the stage that came out of order and mark Fail on the check that plays it (2.1 for stage 10, 3.1 for stage 20, 4.2 for stage 30), then copy the order line into that check's note.
 - [ ] No stage was set before the stage that must come first.
   Expect: no `[TWE] WARNING: stage ... set before stage ...` line. A console `setstage` that skips ahead writes one.
   log: no-skipped-stage
