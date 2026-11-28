@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.1 (unreleased)
+## 0.5.1 (2026-11-27)
 
 This release fixes what the 0.5.0 reviews found, makes the tool refuse more typos before they cost a file, adds a stylesheet for the fragment, and adds a release job to CI.
 
