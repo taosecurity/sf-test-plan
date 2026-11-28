@@ -389,8 +389,10 @@ def as_json(result: dict) -> str:
 
 
 def is_network_path(path: str) -> bool:
-    """True for a path that starts with two slashes or backslashes: a Windows network (UNC) path, \\\\?\\UNC\\ included."""
-    return path[:2] in ("\\\\", "//", "\\/", "/\\")
+    """True for a path that starts with two slashes or backslashes (a Windows network (UNC) path, \\\\?\\UNC\\
+    included) or with the NT prefix \\??\\, which Windows file calls also accept (\\??\\UNC\\ reaches a share)."""
+    head = path[:4].replace("/", "\\")
+    return head[:2] == "\\\\" or head == "\\??\\"
 
 
 def tested_zip_from_plan(plan_path: str, zip_value: str) -> str:

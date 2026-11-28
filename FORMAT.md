@@ -40,7 +40,7 @@ Text right after a group heading is the group's introduction.
 1. **Title.** The first `# ` line is the title. It is required.
 2. **Header keys.** `key: value` lines right after the title (a blank line between the title and the first key is allowed). A blank line after the keys ends the header, so a later line such as `Warning: back up your saves.` is introduction text. Keys are case-insensitive.
    - `run` (required): a short id for this test round, such as `beacon-0.1.0`. Marks are saved under it, so a new build gets a new `run` and starts with empty marks. Allowed characters: letters, digits, `.`, `_`, `-`; 1 to 64 characters.
-   - `mod`, `version`, `zip` (optional): shown in the page's facts box. `check-build` reads `zip` as the tested zip, relative to the plan's folder; a network path there (starting with `\\` or `//`) is refused.
+   - `mod`, `version`, `zip` (optional): shown in the page's facts box. `check-build` reads `zip` as the tested zip, relative to the plan's folder; a network path there (starting with `\\`, `//` or `\??\`) is refused.
    - `ngplus` (optional): the shared New Game+ page, as an `http://` or `https://` address or a path relative to this page (see 14). Any other value (another scheme such as `javascript:`, a drive path such as `C:\...`, a `//host` address) is an error (`bad-ngplus`).
    - Any other header key is a warning (`unknown header key`).
 3. **Introduction.** Any text after the header and before the first `## ` heading. Markdown inline only (see 6).

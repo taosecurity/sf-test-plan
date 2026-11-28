@@ -91,7 +91,7 @@ It prints `examples/Beacon.testplan.md: 3 groups, 6 checks, 5 smoke; 0 errors, 0
       python -I sf_test_plan.py check-build MyMod.testplan.md --built Built-0.1.0.zip
 
   `check-build` takes the tested zip from the plan's `zip:` line (relative to the plan), or from `--tested`.
-  A network path on the `zip:` line (starting with `\\` or `//`) is refused (exit 2); give `--tested` instead.
+  A network path on the `zip:` line (starting with `\\`, `//` or `\??\`) is refused (exit 2); give `--tested` instead.
 
 - Write only the part of the page a host web page embeds, plus the script and style sheet it needs:
 

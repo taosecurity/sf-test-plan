@@ -440,5 +440,28 @@ class CodeReviewRound6(Base):
         self.assertIn("ok\\nOK: fake line\\u001b[2J", out)
 
 
+class CodeReviewRound7(Base):
+    """0.5.1 code review round 7: the NT prefix \\??\\ (which Windows file calls accept, \\??\\UNC\\ reaching a
+    share) can't slip a network path past the zip: line refusal."""
+
+    def test_nt_prefix_zip_line_is_refused(self):
+        built = self.zip("b.zip", {"MyMod.esm": "x"})
+        for value in ("\\??\\UNC\\server\\share\\x.zip", "/??/UNC/server/share/x.zip", "\\??/UNC\\server\\x.zip"):
+            with self.subTest(value=value):
+                self.assertTrue(builds.is_network_path(value))
+                plan = self.write("p.testplan.md", "# T\nrun: a\nzip: " + value + "\n\n## 1 G\n- [ ] one\n")
+                with mock.patch.object(builds.os.path, "isfile", side_effect=AssertionError("opened")):
+                    with self.assertRaises(cli.SetupError) as cm:
+                        builds.tested_zip_from_plan(plan, value)
+                self.assertIn("network path", str(cm.exception))
+                code, out, err = run("check-build", plan, "--built", built)
+                self.assertEqual(code, 2, out + err)
+
+    def test_ordinary_names_are_not_network_paths(self):
+        for value in ("Mod-0.1.0.zip", "??/Mod.zip", "\\Mods\\Mod.zip", "C:\\Mods\\Mod.zip"):
+            with self.subTest(value=value):
+                self.assertFalse(builds.is_network_path(value))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -267,7 +267,7 @@ WARNING: BeaconMod.esm differs, but the --pins file allows this exact pair: rebu
 OK: the built zip has the same plugins, scripts and other files as the tested zip.
 ```
 
-`check-build` does the same with the zip named by the plan's `zip:` line (relative to the plan's folder, or give `--tested`) and a new build given with `--built`. A network path on the `zip:` line (one that starts with `\\` or `//`) is refused, because on Windows even looking for it sends your sign-in to that computer; copy the zip to this PC, or give it with `--tested`:
+`check-build` does the same with the zip named by the plan's `zip:` line (relative to the plan's folder, or give `--tested`) and a new build given with `--built`. A network path on the `zip:` line (one that starts with `\\` or `//`, or with the Windows prefix `\??\`) is refused, because on Windows even looking for it sends your sign-in to that computer; copy the zip to this PC, or give it with `--tested`:
 
 ```
 > sf-test-plan check-build examples\Beacon.testplan.md --built BeaconMod-0.1.1.zip
