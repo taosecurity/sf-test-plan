@@ -81,7 +81,8 @@ def _asset(name: str, required: bool) -> str:
     return text
 
 
-HOST_ASSETS = (("sf-test-plan.js", "page.js"), ("sf-test-plan.css", "page.css"))
+HOST_ASSETS = (("sf-test-plan.js", "page.js"), ("sf-test-plan.css", "page.css"),
+               ("sf-test-plan-fragment.css", "fragment.css"))
 
 
 def asset_bytes(name: str) -> bytes:

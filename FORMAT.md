@@ -110,7 +110,7 @@ Exit codes for `check` and `build`: 0 = no errors (warnings allowed), 1 = errors
 
 `render <plan>` writes the same full page as `build`, to `--out` or to stdout (the check report then goes to stderr). With `--fragment` it writes only `<div class="sf-test-plan" data-run="<run>">`, which holds the intro and facts in `<section class="tp-intro">` (no `<h1>`: the host page has its own heading), the topbar, Before you start, the smoke box, the deep checks or the groups, the log-checks table, the log-lines table, the Results log, and the `tp-config` and `tp-logchecks` JSON. It has no `<style>`, no inline script, no footer and no "done" box. Its `tp-config` is the same as the full page's (`plan` included), so marks saved on one are found on the other.
 
-`--assets DIR` also writes `sf-test-plan.js` (the page script) and `sf-test-plan.css` (the page's style sheet, which the host may use or replace) into DIR. A file there with the same bytes is left alone; one with other bytes is replaced only with `--force`.
+`--assets DIR` also writes `sf-test-plan.js` (the page script), `sf-test-plan.css` (the whole page's style sheet) and `sf-test-plan-fragment.css` (the same rules scoped to `.sf-test-plan`, the one to link beside a fragment; the host may use or replace either) into DIR. A file there with the same bytes is left alone; one with other bytes is replaced only with `--force`.
 
 A host page must:
 

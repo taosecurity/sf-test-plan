@@ -153,5 +153,66 @@ class LogsOutNeedsForce(Base):
         self.assertEqual(run("logs", self.rep, "--plan", self.plan, "--force")[0], 0)
 
 
+class PinsFileReading(Base):
+    """Rows 10 and 3: --pins reads a byte-order mark and UTF-16 like every other JSON input; the warning ends in a period."""
+
+    def zips(self):
+        a, b = self.path("a.zip"), self.path("b.zip")
+        for path, body in ((a, b"ESM1"), (b, b"ESM2")):
+            with zipfile.ZipFile(path, "w") as z:
+                z.writestr("Mod.esm", body)
+        with zipfile.ZipFile(a) as za, zipfile.ZipFile(b) as zb:
+            return a, b, builds._sha16(za, za.getinfo("Mod.esm")), builds._sha16(zb, zb.getinfo("Mod.esm"))
+
+    def pins_bytes(self, sa, sb, why, encoding):
+        doc = {"format": "sf-test-plan-pins/1", "pins": {"mod.esm": {"tested": sa, "built": sb, "why": why}}}
+        path = self.path("pins.json")
+        with open(path, "wb") as f:
+            f.write(json.dumps(doc).encode(encoding))
+        return path
+
+    def test_bom_and_utf16_pins_are_read(self):
+        a, b, sa, sb = self.zips()
+        for enc in ("utf-8-sig", "utf-16"):
+            code, out, err = run("compare-builds", a, b, "--pins", self.pins_bytes(sa, sb, "only the date", enc))
+            self.assertEqual(code, 0, (enc, out, err))
+            self.assertIn("pinned", out)
+
+    def test_check_build_pin_warning_has_a_period(self):
+        a, b, sa, sb = self.zips()
+        pins = self.pins_bytes(sa, sb, "only the date changed", "utf-8")
+        code, out, err = run("check-build", self.write("p.testplan.md", PLAN), "--tested", a, "--built", b, "--pins", pins)
+        self.assertEqual(code, 0, out + err)
+        self.assertIn("exact pair: only the date changed. The tested zip is", out)
+        pins = self.pins_bytes(sa, sb, "only the date changed.", "utf-8")
+        code, out, err = run("check-build", self.write("p.testplan.md", PLAN), "--tested", a, "--built", b, "--pins", pins)
+        self.assertIn("exact pair: only the date changed. The tested zip is", out)
+
+
+class FragmentStylesheet(Base):
+    """Row 1: render --assets also writes a style sheet scoped to .sf-test-plan; row 16: the page.js comment."""
+
+    def test_assets_hold_a_scoped_fragment_sheet(self):
+        plan = self.write("p.testplan.md", PLAN)
+        out, assets = self.path("frag.html"), self.path("assets")
+        code, so, err = run("render", plan, "--fragment", "--out", out, "--assets", assets)
+        self.assertEqual(code, 0, so + err)
+        css = open(os.path.join(assets, "sf-test-plan-fragment.css"), encoding="utf-8").read()
+        import re
+        body = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+        for m in re.finditer(r"(?:^|[}\n])\s*([^{}@\n][^{}]*)\{", body):
+            for sel in m.group(1).split(","):
+                sel = sel.strip()
+                if sel and not re.match(r"^(\.sf-test-plan|:root(:not\(\[data-theme=\"light\"\]\)|\[data-theme=\"dark\"\]) \.sf-test-plan)", sel):
+                    self.fail(f"selector not scoped to .sf-test-plan: {sel}")
+        self.assertNotIn("body{", body)
+        # the whole-page sheet is still written, unchanged
+        self.assertTrue(os.path.exists(os.path.join(assets, "sf-test-plan.css")))
+
+    def test_page_script_comment_is_not_stale(self):
+        with open(os.path.join(ROOT, "assets", "page.js"), encoding="utf-8") as f:
+            self.assertNotIn("This matches `sf-test-plan import`", f.read())
+
+
 if __name__ == "__main__":
     unittest.main()

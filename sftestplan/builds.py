@@ -21,7 +21,7 @@ import tempfile
 import zipfile
 import zlib
 
-from . import pex
+from . import pex, results
 from .model import SetupError
 
 log = logging.getLogger("sf-test-plan")
@@ -246,13 +246,7 @@ def load_pins(path: str | None) -> dict:
         return {}
     fix = f'Give a JSON file like {{"format": "{PINS_FORMAT}", "pins": {{"mymod.esm": {{"tested": "<16 hex>", ' \
           '"built": "<16 hex>", "why": "<text>"}}}.'
-    try:
-        with open(path, encoding="utf-8") as f:
-            data = json.load(f)
-    except OSError as e:
-        raise SetupError(f"can't read the --pins file {path}: {e.strerror}. {fix}")
-    except (ValueError, UnicodeDecodeError) as e:
-        raise SetupError(f"the --pins file {path} is not valid JSON ({e}). {fix}")
+    data = results._load_json(path, fix)   # reads a byte-order mark and UTF-16 too, like every other JSON input
     if not isinstance(data, dict) or data.get("format") != PINS_FORMAT:
         raise SetupError(f"the --pins file {path} has no \"format\": \"{PINS_FORMAT}\". {fix}")
     pins = data.get("pins")
@@ -339,7 +333,7 @@ def _compare(tested: str, built: str, pins: dict) -> dict:
             pin = pins.get(base)
             if pin and pin[0] == sa and pin[1] == sb:
                 add(name, "pinned", pin[2])
-                warnings.append(f"{name} differs, but the --pins file allows this exact pair: {pin[2]}")
+                warnings.append(f"{name} differs, but the --pins file allows this exact pair: {pin[2].rstrip().rstrip('.')}.")
                 continue
             add(name, "differs", detail)
             problems.append(f"{name} differs: {detail}.")

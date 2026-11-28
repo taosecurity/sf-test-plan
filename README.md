@@ -237,19 +237,20 @@ Nothing to add, so nothing was written.
 
 ### render
 
-`render` writes the same page as `build`, to `--out` (or to stdout, with the report on stderr). With `--fragment` it writes only the checklist, inside `<div class="sf-test-plan">`, with no styles, no inline script and no footer, so a web page of your own can hold it. `--assets DIR` also writes `sf-test-plan.js` and `sf-test-plan.css` into DIR (it makes the folder, and it replaces a file that has other contents only with `--force`). The host page links the stylesheet, has a viewport meta tag, and loads the script after the fragment. It holds one fragment:
+`render` writes the same page as `build`, to `--out` (or to stdout, with the report on stderr). With `--fragment` it writes only the checklist, inside `<div class="sf-test-plan">`, with no styles, no inline script and no footer, so a web page of your own can hold it. `--assets DIR` also writes `sf-test-plan.js`, `sf-test-plan.css` (the style of the whole page) and `sf-test-plan-fragment.css` (the same style with every rule scoped to `.sf-test-plan`) into DIR (it makes the folder, and it replaces a file that has other contents only with `--force`). Link `sf-test-plan-fragment.css` beside a fragment: `sf-test-plan.css` also styles `body`, headings and links, so it would restyle the whole host page. The host page has a viewport meta tag and loads the script after the fragment. It holds one fragment:
 
 ```
 > sf-test-plan render examples\Beacon.testplan.md --fragment --out frag.html --assets assets
 examples\Beacon.testplan.md: 3 groups, 6 checks, 5 smoke; 0 errors, 0 warnings
 Wrote: assets\sf-test-plan.js
 Wrote: assets\sf-test-plan.css
+Wrote: assets\sf-test-plan-fragment.css
 Fragment: frag.html
 ```
 
 ```html
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="assets/sf-test-plan.css">
+<link rel="stylesheet" href="assets/sf-test-plan-fragment.css">
 ...
 <!-- the contents of frag.html here -->
 <script src="assets/sf-test-plan.js"></script>

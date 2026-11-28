@@ -96,7 +96,7 @@ It prints `examples/Beacon.testplan.md: 3 groups, 6 checks, 5 smoke; 0 errors, 0
 
       python -I sf_test_plan.py render MyMod.testplan.md --fragment --out frag.html --assets assets
 
-  The host page links `assets/sf-test-plan.css`, has a viewport meta tag, holds one fragment and loads
+  The host page links `assets/sf-test-plan-fragment.css` (not `sf-test-plan.css`, which styles the whole page), has a viewport meta tag, holds one fragment and loads
   `assets/sf-test-plan.js` after it. `--force` replaces an `--assets` file that has other contents. Without `--out`
   the page goes to stdout and the report to stderr.
 
@@ -137,7 +137,7 @@ Run `check` after every edit and fix what it reports before building.
 | `import` | a marks file; the plan; the results file | `<plan>.results.json` (new row first) |
 | `logs` | a papyrus-log-check JSON report; the plan | a marks file (`--out`, default `<report>.marks.json`; never the plan, the report or the results file; an existing file is replaced only with `--force`; and refuses an output that is a symbolic link, a read-only file or not a regular file) |
 | `rules` | the plan; the `--from` rule file if given | a rule file (`--out`, default the `--from` file, else `<plan name>.logrules.json`; refuses to replace a file without `--force`, never writes over the plan or the results file, and refuses an output that is a symbolic link, a read-only file or not a regular file); writes nothing when no id is missing |
-| `render` | as `build`, plus a `--style` file | the page or `--fragment` (`--out`, else stdout); with `--assets DIR`, `sf-test-plan.js` and `sf-test-plan.css` in DIR (an existing file with other contents only with `--force`) |
+| `render` | as `build`, plus a `--style` file | the page or `--fragment` (`--out`, else stdout); with `--assets DIR`, `sf-test-plan.js`, `sf-test-plan.css` and `sf-test-plan-fragment.css` in DIR (an existing file with other contents only with `--force`) |
 | `compare-builds` | two mod zips; a `--pins` file if given | nothing (prints the result; `--json` for JSON) |
 | `check-build` | the plan; its tested zip (the `zip:` line or `--tested`); the `--built` zip; a `--pins` file if given | nothing |
 | `ngplus` | the base plan; the mods' plans; the `--order` file | the shared plan (`--out`; refuses to replace a file without `--force`) and the order file (created or extended) |

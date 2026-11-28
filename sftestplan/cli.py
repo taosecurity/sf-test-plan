@@ -128,7 +128,7 @@ def _plan_assets(args) -> list[tuple[str, bytes, bool]]:
     """The --assets files to write: (path, bytes, already the same). All refusals come before anything is written."""
     folder = args.assets
     if os.path.lexists(folder) and not os.path.isdir(folder):
-        raise SetupError(f"--assets {folder} isn't a folder. Give a folder for sf-test-plan.js and sf-test-plan.css.")
+        raise SetupError(f"--assets {folder} isn't a folder. Give a folder for sf-test-plan.js, sf-test-plan.css and sf-test-plan-fragment.css.")
     todo = []
     for name, source in render.HOST_ASSETS:
         path = os.path.join(folder, name)
@@ -661,7 +661,7 @@ def build_parser() -> argparse.ArgumentParser:
                     help="write only <div class=\"sf-test-plan\">: no <h1>, styles, inline script or footer (the host "
                          "page loads sf-test-plan.js after it)")
     rd.add_argument("--out", metavar="FILE", help="file to write (default: print to stdout; the report goes to stderr)")
-    rd.add_argument("--assets", metavar="DIR", help="also write sf-test-plan.js and sf-test-plan.css into DIR for a host page")
+    rd.add_argument("--assets", metavar="DIR", help="also write sf-test-plan.js, sf-test-plan.css (the whole page) and sf-test-plan-fragment.css (for a fragment) into DIR for a host page")
     rd.add_argument("--rules", metavar="FILE", help="papyrus-log-check rule file, as for build")
     rd.add_argument("--style", metavar="FILE", help=style_help + "; style errors stop it")
     rd.add_argument("--force", action="store_true", help="replace --assets files that have other contents")

@@ -328,7 +328,8 @@
   }
   /* With a smoke test, the round is a smoke round until any deep check is marked: then only smoke checks count,
      against the smoke total. Once a deep check is marked it is a full round: every check counts, against all
-     checks. This matches `sf-test-plan import` ("Smoke test" / "Full test"). */
+     checks. The page tally counts this way; `sf-test-plan import` counts the marks it reads by its own rule
+     (a smoke round and a full round can show different numbers). */
   function fullRound() {
     return Object.keys(byId).some(function (id) { return inDeep(byId[id].li) && state[id] && state[id].r; });
   }

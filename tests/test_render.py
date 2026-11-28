@@ -148,7 +148,7 @@ class AssetsTests(unittest.TestCase):
         self.render_assets()
         code, out, _ = self.render_assets()
         self.assertEqual(code, 0)
-        self.assertEqual(out.count("Unchanged: "), 2)
+        self.assertEqual(out.count("Unchanged: "), 3)
 
     def test_other_bytes_need_force(self):
         self.render_assets()
