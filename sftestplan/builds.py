@@ -3,8 +3,9 @@
 Read only. Plugin entries (.esm, .esp, .esl, .ba2) are compared by CRC-32 and size first. A .ba2 that differs is
 copied, one at a time, to a temporary file and opened: each file inside is compared by its unpacked content, and a
 .pex script is compared by meaning (pex.listing: compile time and string-table order ignored), so a recompile of the
-same source still matches. A loose .pex is compared the same way. A script that listing() can't read is compared by its bytes with the compile time zeroed. Every other file entry (an SFSE DLL, an .ini, an interface file) is compared by CRC-32, size and sha256, except, in a zip that has a plugin, documents (.txt, .md, .pdf and the like), pictures (.png, .jpg), a fomod
-folder, extensionless readme and license files and OS junk (__MACOSX, Thumbs.db).
+same source still matches. A loose .pex is compared the same way. A script that listing() can't read is compared by its bytes with the compile time zeroed. Every other file entry (an SFSE DLL, an .ini, an interface file) is compared by CRC-32, size and sha256, except, in a zip that has a plugin, documents (.txt, .md, .pdf and the like), pictures (.png, .jpg) and
+extensionless readme and license files outside the game's folders (0.5.1: one under Interface, SFSE, MCM, Scripts
+and the like is compared, since the game or a plugin may read it), a fomod folder and OS junk (__MACOSX, Thumbs.db).
 """
 from __future__ import annotations
 
@@ -30,8 +31,16 @@ PLUGIN_EXTS = (".esm", ".esp", ".esl", ".ba2")
 # installer folder, extensionless readme and license files, and the junk files macOS and Windows add.
 DOC_EXTS = (".txt", ".md", ".rtf", ".pdf", ".url", ".html", ".htm", ".docx",
             ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp")
-_DOC_NAMES = {"readme", "license", "licence", "changelog", "changes", "credits", "copying", "authors",
-              "thumbs.db", "desktop.ini", ".ds_store"}
+_DOC_NAMES = {"readme", "license", "licence", "changelog", "changes", "credits", "copying", "authors"}
+_JUNK_NAMES = {"thumbs.db", "desktop.ini", ".ds_store"}
+# Folders the game, SFSE or a plugin reads files from (0.5.1). A document or picture inside one of them (at any
+# depth, such as Data/Interface/fontconfig.txt or Data/SFSE/Plugins/MyMod/notes.txt) is part of the mod and is
+# compared; one outside them (the zip's top level, Data itself, a docs or images folder) is packaging.
+GAME_DIRS = frozenset({
+    "interface", "sfse", "mcm", "scripts", "textures", "meshes", "materials", "sound", "music", "strings", "video",
+    "geometries", "terrain", "particles", "planetdata", "shadersfx", "lodsettings", "misc", "distantlod", "vis",
+    "fonts", "effects", "lighting", "facegen", "animations", "animationdata", "seq", "naf", "plugins",
+})
 PINS_FORMAT = "sf-test-plan-pins/1"
 COMPARE_FORMAT = "sf-test-plan-compare/1"
 _SHA16 = re.compile(r"[0-9a-f]{16}")
@@ -67,10 +76,14 @@ def zip_entries(zf: zipfile.ZipFile, every_file: bool = False) -> dict:
 
 
 def _is_packaging(key: str) -> bool:
-    """A document, picture, fomod or OS junk entry (key: lower case, forward slashes), ignored beside a plugin."""
+    """A packaging entry (key: lower case, forward slashes), ignored beside a plugin: OS junk or a fomod folder
+    anywhere, or a document or picture outside the game's folders (GAME_DIRS)."""
     parts = key.split("/")
-    return (key.endswith(DOC_EXTS) or parts[-1] in _DOC_NAMES or "fomod" in parts[:-1]
-            or parts[0] == "__macosx")
+    if parts[0] == "__macosx" or parts[-1] in _JUNK_NAMES or "fomod" in parts[:-1]:
+        return True
+    if not (key.endswith(DOC_EXTS) or parts[-1] in _DOC_NAMES):
+        return False
+    return not any(p in GAME_DIRS for p in parts[:-1])
 
 
 def _has_plugin(entries: dict) -> bool:

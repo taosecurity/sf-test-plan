@@ -116,7 +116,7 @@ The whole format, every warning and every file sf-test-plan reads or writes are 
 | `sf-test-plan build PLAN [--out PAGE] [--rules FILE] [--style FILE]` | Checks the plan and writes the page (default: the plan's name with `.html`). |
 | `sf-test-plan check PLAN [--rules FILE] [--style FILE]` | Checks the plan for mistakes without writing anything. With `--rules`, it also checks every `log:` id against a papyrus-log-check rule file. With `--style`, it also checks your own writing rules. |
 | `sf-test-plan import MARKS --plan PLAN` | Adds a marks file (from the page's Export button) to `<plan>.results.json` as one results row, and prints the tally. Build again to show it on the page. |
-| `sf-test-plan logs REPORT --plan PLAN [--mod NAME] [--out MARKS]` | Reads a papyrus-log-check JSON report and writes marks for the steps with `log:` ids. Import them on the page, then Export and give that file to `import` (the marks file alone holds none of the page's marks). |
+| `sf-test-plan logs REPORT --plan PLAN [--mod NAME] [--out MARKS] [--force]` | Reads a papyrus-log-check JSON report and writes marks for the steps with `log:` ids (an existing marks file is replaced only with `--force`). Import them on the page, then Export and give that file to `import` (the marks file alone holds none of the page's marks). |
 | `sf-test-plan rules PLAN [--out FILE] [--from FILE] [--prefix TEXT] [--plugin NAME] [--force]` | Writes a starter papyrus-log-check rule file with a rule for each `log:` id in the plan, or adds the missing ids to the rule file you already have. |
 | `sf-test-plan new PLAN [--mod NAME] [--force]` | Writes a starter plan. |
 | `sf-test-plan render PLAN [--fragment] [--out FILE] [--assets DIR] [--force]` | Writes the page, or with `--fragment` only the part a host page embeds. See "render" below. |
@@ -124,7 +124,7 @@ The whole format, every warning and every file sf-test-plan reads or writes are 
 | `sf-test-plan check-build PLAN --built ZIP [--tested ZIP] [--pins FILE] [--json]` | Says whether the plan's tested zip holds the same plugins, scripts and other files as a new build. |
 | `sf-test-plan ngplus --base FILE --order FILE --out FILE PLAN...` | Writes one shared New Game+ plan from several mods' plans. |
 
-Every command also takes `--verbose` and `--log FILE`. The exit codes are:
+Every command also takes `--verbose` and `--log FILE`. The log file must not be one of the command's own files (the plan, its results file, a report, marks, pins or rule file, a zip or `--out`): such a `--log` is refused with exit 2 before anything is written. The exit codes are:
 
 | Exit code | Meaning |
 |---|---|
@@ -132,7 +132,7 @@ Every command also takes `--verbose` and `--log FILE`. The exit codes are:
 | 1 | The plan has errors (each one is printed with its line number and the fix). For `compare-builds` and `check-build`, 1 means the zips differ. |
 | 2 | A file can't be read or written, or an option is wrong. |
 
-`build`, `logs` and `rules` never write over the plan or the plan's results file, `logs` never writes over its report, and `build` never writes over its `--rules` file. They also refuse an output that is a symbolic link, a read-only file or something other than a regular file. In each case the command stops with exit 2, writes nothing, and names the file (from `--out`, `--from` or the default name) and the fix, usually to give another name with `--out`. The null device (`NUL` on Windows, `/dev/null` elsewhere) is allowed as an output. `rules` checks for a link or a read-only file only when it would write, so a linked `--from` file with nothing to add still exits 0.
+`build`, `logs` and `rules` never write over the plan or the plan's results file, `logs` never writes over its report and replaces an existing marks file only with `--force`, and `build` never writes over its `--rules` file. They also refuse an output that is a symbolic link, a read-only file or something other than a regular file. In each case the command stops with exit 2, writes nothing, and names the file (from `--out`, `--from` or the default name) and the fix, usually to give another name with `--out`. The null device (`NUL` on Windows, `/dev/null` elsewhere) is allowed as an output. `rules` checks for a link or a read-only file only when it would write, so a linked `--from` file with nothing to add still exits 0.
 
 ### build and check
 
@@ -259,7 +259,7 @@ Marks saved on the full page are found on the fragment, and the other way round.
 
 ### compare-builds and check-build
 
-After a test round, these say whether the zip you tested is the build you are about to release. `compare-builds` compares the files in two zips. A `.esm`, `.esp` or `.esl` is compared by checksum, and each `.ba2` by what is inside it, so a different archive packing alone is not a difference. Every other file is compared by checksum too, such as an SFSE DLL, an `.ini` or a loose Papyrus script (a `.pex` file outside an archive). In a zip that has a plugin, the files that may change between builds without changing the mod are left out: documents (`.txt`, `.md`, `.pdf` and the like), pictures (`.png`, `.jpg`), a `fomod` folder, readme and license files with no extension, and the junk files macOS and Windows add (`__MACOSX`, `Thumbs.db`). A zip with no plugin, such as a DLL-only mod, has every file compared. A script, inside an archive or loose, is compared by what it does, so recompiling the same source, which gives the script a new compile time and a new order of its names, is not a difference either. The exit code is 0 when they match and 1 when they differ:
+After a test round, these say whether the zip you tested is the build you are about to release. `compare-builds` compares the files in two zips. A `.esm`, `.esp` or `.esl` is compared by checksum, and each `.ba2` by what is inside it, so a different archive packing alone is not a difference. Every other file is compared by checksum too, such as an SFSE DLL, an `.ini` or a loose Papyrus script (a `.pex` file outside an archive). In a zip that has a plugin, the files that may change between builds without changing the mod are left out: documents (`.txt`, `.md`, `.pdf` and the like), pictures (`.png`, `.jpg`) and readme and license files with no extension, when they are outside the game's folders, and anywhere a `fomod` folder and the junk files macOS and Windows add (`__MACOSX`, `Thumbs.db`). A document or picture inside a folder the game or a plugin reads from (`Interface`, `SFSE`, `MCM`, `Scripts`, `Textures` and the like, such as `Data/Interface/fontconfig.txt`) is part of the mod and is compared. A zip with no plugin, such as a DLL-only mod, has every file compared. A script, inside an archive or loose, is compared by what it does, so recompiling the same source, which gives the script a new compile time and a new order of its names, is not a difference either. The exit code is 0 when they match and 1 when they differ:
 
 ```
 > sf-test-plan compare-builds BeaconMod-0.1.0.zip BeaconMod-0.1.1.zip

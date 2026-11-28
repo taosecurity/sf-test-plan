@@ -236,6 +236,9 @@ def cmd_logs(args) -> int:
     if os.path.isdir(out):
         raise SetupError(f"{out} is a folder, not a marks file. Give a file name with --out, such as {out}{os.sep}marks.json.")
     _refuse_unsafe_output(out, given, fix)
+    if not args.force and os.path.isfile(out) and os.path.normcase(out) != os.path.normcase(os.devnull):
+        raise SetupError(f"{given} already exists, so nothing was written. Add --force to replace it, or give the "
+                         "marks file another name with --out.")
     marks, lines = results.logs_to_marks(plan, report, args.mod, _now())
     for line in lines:
         print(line)
@@ -301,6 +304,25 @@ def _mod_from_path(path: str) -> str:
 
 def _count(n: int, word: str) -> str:
     return f"{n} {word}" + ("" if n == 1 else "s")
+
+
+_LOG_GUARDED = (("plan", "the plan"), ("marks", "the marks file"), ("report", "the report"),
+                ("rules", "the --rules file"), ("style", "the --style file"), ("from_file", "the --from file"),
+                ("tested", "the tested zip"), ("built", "the built zip"), ("pins", "the --pins file"),
+                ("base", "the --base plan"), ("order", "the --order file"), ("out", "the --out file"))
+
+
+def _refuse_log_over_file(args) -> None:
+    """0.5.1: --log opens its file for writing first, so a --log that names an input (or the output) would empty
+    it before it is read. Refuse it, before anything is written."""
+    named = [(getattr(args, attr, None), what) for attr, what in _LOG_GUARDED]
+    named += [(p, "one of the plans") for p in getattr(args, "plans", None) or []]
+    for path in [getattr(args, "plan", None)] + list(getattr(args, "plans", None) or []):
+        if path:
+            named.append((results.results_path(path), "the plan's results file"))
+    for path, what in named:
+        if path and _same_file(args.log, path):
+            raise SetupError(f"--log {args.log} is {what}, so nothing was written. Give the log file another name.")
 
 
 def _same_file(a: str, b: str) -> bool:
@@ -661,6 +683,7 @@ def build_parser() -> argparse.ArgumentParser:
     lg.add_argument("--plan", required=True)
     lg.add_argument("--mod", help="the mod's name in the report, when it holds several")
     lg.add_argument("--out", metavar="FILE", help="marks file (default: <report>.marks.json)")
+    lg.add_argument("--force", action="store_true", help="replace an existing marks file")
     lg.set_defaults(func=cmd_logs)
 
     r = sub.add_parser("rules", parents=[common],
@@ -738,6 +761,8 @@ def main(argv: list[str] | None = None) -> int:
     except SystemExit as e:
         return 0 if e.code == 0 else 2
     try:
+        if args.log:
+            _refuse_log_over_file(args)
         _setup_logging(args.verbose, args.log)
         return args.func(args)
     except SetupError as e:
