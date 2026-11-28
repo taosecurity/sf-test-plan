@@ -264,7 +264,7 @@ def logs_to_marks(plan: Plan, report: dict, mod: str | None, now: str,
         raise SetupError(f"{source} has no \"mods\" list, so it isn't a papyrus-log-check JSON report. {fix}")
     mods = [m for m in report["mods"] if isinstance(m, dict)]
     if not mods:
-        raise SetupError(f"the report lists no mods. Run papyrus-log-check with your mod's rule file. {fix}")
+        raise SetupError(f"{source} lists no mods. Run papyrus-log-check with your mod's rule file. {fix}")
     entry, how = _pick_mod(plan, mods, mod)
     name = entry.get("mod")
     lines = [how]

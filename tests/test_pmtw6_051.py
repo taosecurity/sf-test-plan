@@ -197,7 +197,8 @@ class FragmentStylesheet(Base):
         out, assets = self.path("frag.html"), self.path("assets")
         code, so, err = run("render", plan, "--fragment", "--out", out, "--assets", assets)
         self.assertEqual(code, 0, so + err)
-        css = open(os.path.join(assets, "sf-test-plan-fragment.css"), encoding="utf-8").read()
+        with open(os.path.join(assets, "sf-test-plan-fragment.css"), encoding="utf-8") as f:
+            css = f.read()
         import re
         body = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
         for m in re.finditer(r"(?:^|[}\n])\s*([^{}@\n][^{}]*)\{", body):
@@ -321,8 +322,8 @@ class CodeReviewRound2(Base):
         code, so, err = run("render", plan, "--fragment", "--out", out, "--assets", assets)
         self.assertEqual(code, 0, so + err)
         self.assertNotIn('class="wrap"', self.read("frag.html"))
-        css = re.sub(r"/\*.*?\*/", "", open(os.path.join(assets, "sf-test-plan-fragment.css"), encoding="utf-8").read(),
-                     flags=re.S)
+        with open(os.path.join(assets, "sf-test-plan-fragment.css"), encoding="utf-8") as f:
+            css = re.sub(r"/\*.*?\*/", "", f.read(), flags=re.S)
         rules = re.findall(r"(?:^|(?<=\}))\s*\.sf-test-plan\{([^}]*)\}", css)
         layout = " ".join(rules)
         for want in ("display:grid", "gap:22px", "max-width:76rem"):
@@ -375,6 +376,30 @@ class CodeReviewRound3(Base):
         self.assertEqual(code, 2, out + err)
         self.assertIn("the --pins file: ", err)
         self.assertIn("isn't valid JSON", err)
+
+
+class CodeReviewRound4(Base):
+    """0.5.1 code review round 4: the --verbose reason is escaped too (it can quote text from inside a script), and
+    logs names the report file when its mods list is empty."""
+
+    def test_verbose_reason_escapes_text_from_the_script(self):
+        import hashlib
+        from unittest import mock
+        bad = builds.pex.PexError("object evil\x1b[2J‮name read 3 bytes but its size field says 9")
+        with mock.patch.object(builds.pex, "listing", side_effect=bad):
+            with self.assertLogs(builds.log, level="DEBUG") as cm:
+                builds._pex_digest(hashlib.sha256(), b"x" * 20, "Data/Scripts/a.pex")
+        text = "\n".join(cm.output)
+        self.assertNotIn("\x1b", text)
+        self.assertNotIn("‮", text)
+        self.assertIn("evil\\u001b[2J\\u202ename", text)
+
+    def test_empty_mods_list_names_the_report(self):
+        plan = self.write("p.testplan.md", PLAN)
+        report = self.write("empty-report.json", json.dumps({"mods": []}))
+        code, out, err = run("logs", report, "--plan", plan)
+        self.assertEqual(code, 2, out + err)
+        self.assertIn("empty-report.json lists no mods", err)
 
 
 if __name__ == "__main__":

@@ -97,7 +97,7 @@ def _pex_digest(h, data: bytes, name: str) -> str:
         h.update("\n".join(pex.listing(data)).encode("utf-8"))   # by meaning: string-table order ignored
         return h.hexdigest()[:16]
     except pex.PexError as err:
-        log.debug("%s: compared by bytes (compile time zeroed) because %s", one_line(name), err)
+        log.debug("%s: compared by bytes (compile time zeroed) because %s", one_line(name), one_line(str(err)))
     if len(data) >= 16 and data[:4] in _PEX_MAGIC:
         data = data[:8] + b"\0" * 8 + data[16:]   # zero the compile time
     h.update(data)
