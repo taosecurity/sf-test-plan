@@ -3,13 +3,15 @@
 #
 # Runs the unit tests on Windows and Linux with Python 3.10 and 3.13, builds the release zip on both, and checks
 # that both systems built the same zip, byte for byte. Runs the page script's browser test (tests/page_test.mjs)
-# on Windows with the runner's Chrome. Releases are made by hand (README, "Release"), not here.
+# on Windows with the runner's Chrome. Pushing a version tag (v*) runs the release job, which builds the zip from
+# the tag and publishes the GitHub release once every test job has passed (README, "For developers").
 # Actions are pinned to full commit SHAs (the tag each one was at is in the comment).
 name: tests
 
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
 
@@ -80,3 +82,49 @@ jobs:
       - name: Page test on the fixture page
         if: steps.chrome.outputs.found == 'true'
         run: node tests/page_test.mjs tests/fixtures/page_fixture.html
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test, same-zip, page-test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Build the release zip from the tag (fails if the tag, version or CHANGELOG disagree)
+        run: python -I build_release.py --tag "$GITHUB_REF_NAME"
+      - name: Check the checksums
+        working-directory: dist
+        run: sha256sum -c ./*.sha256
+      - name: Release notes from CHANGELOG.md
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '$0 ~ "^## "v"( |$)" {on=1; next} /^## [0-9]+\.[0-9]+\.[0-9]+/ {on=0} on' CHANGELOG.md > release-notes.md
+          grep -q '[^[:space:]]' release-notes.md || { echo "CHANGELOG.md has no section for $version"; exit 1; }
+          printf '\nCheck each download against its .sha256 file.\n' >> release-notes.md
+      - name: Publish the GitHub release (safe to rerun, never replaces a file)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="sf-test-plan ${GITHUB_REF_NAME#v}"
+          if out=$(gh release view "$GITHUB_REF_NAME" --json assets -q '.assets[].name' 2>&1); then
+            have=0; missing=0
+            for f in dist/*; do
+              if printf '%s\n' "$out" | grep -qxF "$(basename "$f")"; then have=$((have+1)); else missing=$((missing+1)); fi
+            done
+            if [ "$missing" -gt 0 ] && [ "$have" -gt 0 ]; then
+              echo "The release has $have of the files and lacks $missing. Fix it by hand; a rerun never replaces a published file."; exit 1
+            fi
+            if [ "$missing" -gt 0 ]; then   # an earlier run made the release, then failed: upload everything, checksums last
+              gh release upload "$GITHUB_REF_NAME" $(ls dist/* | grep -v '\.sha256$')
+              gh release upload "$GITHUB_REF_NAME" dist/*.sha256
+            fi
+            gh release edit "$GITHUB_REF_NAME" --title "$title" --notes-file release-notes.md --draft=false
+          elif printf '%s' "$out" | grep -q 'release not found'; then
+            gh release create "$GITHUB_REF_NAME" dist/* --title "$title" --notes-file release-notes.md --verify-tag
+          else
+            echo "gh release view failed: $out"; exit 1
+          fi

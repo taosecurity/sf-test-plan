@@ -400,6 +400,7 @@ New to testing mods? The STEP project's [Mod Testing guide](https://wiki.step-pr
 
 GitHub Actions runs the unit tests on Windows and Linux with Python 3.10 and 3.13. It also checks that both systems build the same release zip, and it runs the page test with Chrome on Windows.
 
+- **Release:** pushing a version tag (`v0.5.1`, say) makes GitHub Actions build the zip and its `.sha256` file from the tag with `build_release.py --tag`, once every test job has passed, and publish the release with the CHANGELOG entry as its text. Nobody uploads a release by hand. Locally, `python -I build_release.py` builds the same zip from the last commit.
 - **Unit tests:** `python -I -m unittest discover -s tests`.
 - **Page test:** `node tests\page_test.mjs <page.html> [screenshots folder]` tests the page's script in a browser. It needs Node 22 or newer (for its built-in WebSocket) and Google Chrome on Windows.
 - **Chrome settings:** set `CHROME_PATH` if Chrome is somewhere else. Set `TP_CDP_WAIT` (1 to 600 seconds, default 30) to wait longer for Chrome to start. The test runs Chrome headless with the profile folder `%LOCALAPPDATA%\HeadlessChromeProfile`.
