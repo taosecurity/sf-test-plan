@@ -272,6 +272,8 @@ class CodeReviewRound1(Base):
             self.assertFalse(cli._same_file(one, two))
         self.assertTrue(cli._same_file(one, one))
 
+    # The colon (file stream) refusal runs only on Windows; Linux and macOS allow colons in file names.
+    @unittest.skipIf(sys.platform != "win32", "the colon refusal is Windows-only")
     def test_colon_only_in_the_file_name_counts(self):
         cli._refuse_mod_file_name(os.path.join("runs", "10:00", "page.html"), "--out x", "Fix")
         with self.assertRaises(cli.SetupError):

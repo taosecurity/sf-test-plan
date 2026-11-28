@@ -111,6 +111,11 @@ class OutPaths(Shared):
                     continue
                 if case.get("only_if") == "windows" and not WINDOWS:
                     continue
+                # sf-test-plan refuses a colon in an output's file name only on Windows (a file stream there);
+                # Linux and macOS allow colons, so this shared case is skipped off Windows.
+                if cid == "out-stream-colon" and sys.platform != "win32":
+                    print(f"skipped {cid}: the colon refusal is Windows-only")
+                    continue
                 if case.get("only_if") == "case_insensitive_fs" and not ci:
                     continue
                 if not self.make(case):
