@@ -26,8 +26,9 @@
 }
 .sf-test-plan, .sf-test-plan *{box-sizing:border-box}
 .sf-test-plan{margin:0; background:var(--bg); color:var(--ink); font:16px/1.55 var(--f-body); overflow-wrap:break-word}
-.sf-test-plan .wrap{margin:0 auto; padding-block:28px 64px; padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); display:grid; gap:22px; max-width:76rem; min-width:0}
-.sf-test-plan .wrap > *{min-width:0}
+/* A fragment has no .wrap element: page.css's .wrap column (grid, gap, padding, width) goes on the fragment's own div. */
+.sf-test-plan{margin:0 auto; padding-block:28px 64px; padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); display:grid; gap:22px; max-width:76rem; min-width:0}
+.sf-test-plan > *{min-width:0}
 .sf-test-plan h1, .sf-test-plan h2, .sf-test-plan h3{font-family:var(--f-display); margin:0; text-wrap:balance}
 .sf-test-plan h1{font-size:32px; font-weight:700; line-height:1.15}
 .sf-test-plan h2{font-size:21px; font-weight:700; display:flex; gap:10px; align-items:baseline; flex-wrap:wrap}

@@ -296,5 +296,38 @@ class CodeReviewRound1(Base):
             self.assertIn(want, out)
 
 
+class CodeReviewRound2(Base):
+    """0.5.1 code review round 2: --out NUL with --log NUL, --log over the --base plan's results file, and the
+    fragment sheet's column layout (a fragment has no .wrap element)."""
+
+    def test_out_and_log_both_the_null_device(self):
+        plan = self.write("p.testplan.md", PLAN)
+        code, out, err = run("build", plan, "--out", os.devnull, "--log", os.devnull)
+        self.assertEqual(code, 0, out + err)
+
+    def test_log_naming_the_base_results_file_is_refused(self):
+        import argparse
+        base = self.write("b.testplan.md", PLAN)
+        args = argparse.Namespace(log=results.results_path(base), base=base, plan=self.path("m.testplan.md"),
+                                  out=self.path("s.testplan.md"), func=cli.cmd_ngplus)
+        with self.assertRaises(cli.SetupError) as cm:
+            cli._refuse_log_over_file(args)
+        self.assertIn("is the plan's results file", str(cm.exception))
+
+    def test_fragment_sheet_lays_out_the_fragment_div(self):
+        import re
+        plan = self.write("p.testplan.md", PLAN)
+        out, assets = self.path("frag.html"), self.path("assets")
+        code, so, err = run("render", plan, "--fragment", "--out", out, "--assets", assets)
+        self.assertEqual(code, 0, so + err)
+        self.assertNotIn('class="wrap"', self.read("frag.html"))
+        css = re.sub(r"/\*.*?\*/", "", open(os.path.join(assets, "sf-test-plan-fragment.css"), encoding="utf-8").read(),
+                     flags=re.S)
+        rules = re.findall(r"(?:^|(?<=\}))\s*\.sf-test-plan\{([^}]*)\}", css)
+        layout = " ".join(rules)
+        for want in ("display:grid", "gap:22px", "max-width:76rem"):
+            self.assertIn(want, layout)
+
+
 if __name__ == "__main__":
     unittest.main()

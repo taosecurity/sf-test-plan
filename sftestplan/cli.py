@@ -315,11 +315,12 @@ _LOG_GUARDED = (("plan", "the plan"), ("marks", "the marks file"), ("report", "t
 def _refuse_log_over_file(args) -> None:
     """0.5.1: --log opens its file for writing first, so a --log that names an input (or the output) would empty
     it before it is read. Refuse it, before anything is written."""
-    if os.path.normcase(args.log) != os.path.normcase(os.devnull):
-        _refuse_mod_file_name(args.log, f"--log {args.log}", "Give the log file another name")
+    if os.path.normcase(args.log) == os.path.normcase(os.devnull):
+        return   # the null device empties nothing (--out NUL --log NUL is fine; code review 0.5.1 round 2)
+    _refuse_mod_file_name(args.log, f"--log {args.log}", "Give the log file another name")
     named = [(getattr(args, attr, None), what) for attr, what in _LOG_GUARDED]
     named += [(p, "one of the plans") for p in getattr(args, "plans", None) or []]
-    for path in [getattr(args, "plan", None)] + list(getattr(args, "plans", None) or []):
+    for path in [getattr(args, "plan", None), getattr(args, "base", None)] + list(getattr(args, "plans", None) or []):
         if path:
             named.append((results.results_path(path), "the plan's results file"))
     named += _default_outputs(args)
