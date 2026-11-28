@@ -1,5 +1,5 @@
 /* sf-test-plan fragment style: page.css with every rule scoped to .sf-test-plan, so linking it beside a fragment
-   in a host page does not restyle the host's own body, headings or links. Generated from page.css. */
+   in a host page does not restyle the host's own body, headings or links. It is kept by hand: a change to page.css is made here too. */
 /* sf-test-plan page style. One reading column: a header with facts, a sticky tally and toolbar, then the checks.
    Light and dark follow the system; set data-theme="light" or "dark" on <html> to force one. System fonts only. */
 .sf-test-plan{

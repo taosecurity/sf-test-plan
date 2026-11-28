@@ -154,7 +154,7 @@ class LogsOutNeedsForce(Base):
 
 
 class PinsFileReading(Base):
-    """Rows 10 and 3: --pins reads a byte-order mark and UTF-16 like every other JSON input; the warning ends in a period."""
+    """Rows 10 and 3: --pins reads a byte-order mark and UTF-16 like the marks and report files; the warning ends in a period."""
 
     def zips(self):
         a, b = self.path("a.zip"), self.path("b.zip")
@@ -212,6 +212,88 @@ class FragmentStylesheet(Base):
     def test_page_script_comment_is_not_stale(self):
         with open(os.path.join(ROOT, "assets", "page.js"), encoding="utf-8") as f:
             self.assertNotIn("This matches `sf-test-plan import`", f.read())
+
+
+class CodeReviewRound1(Base):
+    """0.5.1 code review round 1: --log over a default output, escapes in --verbose lines, drives with file ID 0,
+    a folder with a colon, new over a mod file, and the pinned-pair warning's ending."""
+
+    def test_log_naming_the_default_page_is_refused(self):
+        plan = self.write("p.testplan.md", PLAN)
+        page = self.path("p.testplan.html")
+        code, out, err = run("build", plan, "--log", page)
+        self.assertEqual(code, 2, out + err)
+        self.assertIn("is the default page, so nothing was written", err)
+        self.assertFalse(os.path.exists(page))
+
+    def test_log_naming_the_default_marks_file_is_refused(self):
+        plan = self.write("p.testplan.md", PLAN)
+        rep = self.write("r.json", json.dumps(REPORT))
+        code, out, err = run("logs", rep, "--plan", plan, "--log", self.path("r.marks.json"))
+        self.assertEqual(code, 2, out + err)
+        self.assertIn("is the default marks file, so nothing was written", err)
+        self.assertFalse(os.path.exists(self.path("r.marks.json")))
+
+    def test_log_naming_the_default_rule_file_or_an_asset_is_refused(self):
+        plan = self.write("p.testplan.md", PLAN)
+        code, out, err = run("rules", plan, "--log", self.path("p.logrules.json"))
+        self.assertEqual(code, 2, out + err)
+        self.assertIn("is the default rule file", err)
+        assets = self.path("assets")
+        os.mkdir(assets)
+        code, out, err = run("render", plan, "--out", self.path("x.html"), "--assets", assets,
+                             "--log", os.path.join(assets, "sf-test-plan.css"))
+        self.assertEqual(code, 2, out + err)
+        self.assertIn("is one of the --assets files", err)
+        self.assertEqual(os.listdir(assets), [])
+
+    def test_verbose_line_escapes_a_hostile_entry_name(self):
+        name = "Data/Scripts/evil\x1b[31mred.pex"
+        a = self.zip("a.zip", {name: b"not a script 1"})
+        b = self.zip("b.zip", {name: b"not a script 2"})
+        code, out, err = run("compare-builds", a, b, "--verbose")
+        self.assertEqual(code, 1, out + err)
+        self.assertIn("compared by bytes", err)
+        self.assertNotIn("\x1b", out + err)
+        self.assertIn("evil\\u001b[31mred.pex", err)
+
+    def test_file_id_zero_is_not_the_same_file(self):
+        from unittest import mock
+        one, two = self.write("one.txt", "1"), self.write("two.txt", "2")
+        real = os.stat
+
+        def zero_ino(path, *a, **k):
+            s = real(path, *a, **k)
+            return os.stat_result((s.st_mode, 0, s.st_dev, s.st_nlink, s.st_uid, s.st_gid, s.st_size,
+                                   int(s.st_atime), int(s.st_mtime), int(s.st_ctime)))
+        with mock.patch("os.stat", zero_ino):
+            self.assertFalse(cli._same_file(one, two))
+        self.assertTrue(cli._same_file(one, one))
+
+    def test_colon_only_in_the_file_name_counts(self):
+        cli._refuse_mod_file_name(os.path.join("runs", "10:00", "page.html"), "--out x", "Fix")
+        with self.assertRaises(cli.SetupError):
+            cli._refuse_mod_file_name(os.path.join("runs", "report.txt:hidden"), "--out x", "Fix")
+
+    def test_new_refuses_a_mod_file_name(self):
+        esm = self.path("MyMod.esm")
+        with open(esm, "wb") as f:
+            f.write(b"TES4 plugin bytes")
+        code, out, err = run("new", esm, "--force")
+        self.assertEqual(code, 2, out + err)
+        self.assertIn("is named like a mod file", err)
+        with open(esm, "rb") as f:
+            self.assertEqual(f.read(), b"TES4 plugin bytes")
+
+    def test_pin_warning_ending(self):
+        p = PinsFileReading("test_bom_and_utf16_pins_are_read")
+        p.d, p.path = self.d, self.path
+        a, b, sa, sb = p.zips()
+        for why, want in (("", "exact pair. The tested"), ("is it the date?", "exact pair: is it the date? The tested")):
+            pins = p.pins_bytes(sa, sb, why, "utf-8")
+            code, out, err = run("check-build", self.write("p.testplan.md", PLAN), "--tested", a, "--built", b, "--pins", pins)
+            self.assertEqual(code, 0, out + err)
+            self.assertIn(want, out)
 
 
 if __name__ == "__main__":

@@ -8,13 +8,13 @@ This release fixes what the 0.5.0 reviews found, makes the tool refuse more typo
 
 - `compare-builds` and `check-build` now count a document or picture as a difference when it sits in a folder the game reads, such as `Interface`, `SFSE`, `MCM` or `Scripts` (a changed `Data/Interface/fontconfig.txt` used to say OK). Documents and pictures elsewhere in the zip are still ignored.
 - `logs --out` now replaces an existing marks file only with `--force`. This includes the default marks file, so running `logs` twice on one report needs `--force` the second time.
-- `--log` is refused (exit 2, nothing written) when it names one of the command's own files, such as the plan, its results file, a report, a marks, pins or rule file, a zip or `--out`. Before, it emptied that file before it was read.
-- An output (`--out`, `--log`, or a marks or rules file) is refused when it is a hard link to the plan, is named like a mod file (`.esm`, `.esp`, `.esl`, `.ba2`, `.zip`, `.7z`, `.rar`, `.strings`, `.pex`, `.psc` or `.dll`), or holds a colon (a file stream).
-- A `--pins` file saved with a byte-order mark or in UTF-16, as Windows PowerShell 5.1 writes it, is now read like every other JSON input.
+- `--log` is refused (exit 2, nothing written) when it names one of the command's own files, such as the plan, its results file, a report, a marks, pins or rule file, a zip, `--out` or the file a command writes when `--out` is left out (the page, the marks file, the rule file or the `--assets` files). Before, it emptied that file before it was read.
+- An output (`--out`, `--log`, a marks or rules file, or the plan `new` writes) is refused when it is a hard link to the plan, is named like a mod file (`.esm`, `.esp`, `.esl`, `.ba2`, `.zip`, `.7z`, `.rar`, `.strings`, `.pex`, `.psc` or `.dll`), or has a colon in its file name (a file stream).
+- A `--pins` file saved with a byte-order mark or in UTF-16, as Windows PowerShell 5.1 writes it, is now read, as the marks and report files already were.
 - JSON nested too deeply, or with a huge number, is refused naming the file (marks, report, pins, rules and style files). `logs` names the report file when it holds no mods list, and `rules --from` refuses a file whose top level is `null` or a list.
-- Zip entry names in the `compare-builds` and `check-build` output are shown on one line, with control and format characters as `\uXXXX`, so a hostile zip can't fake lines or rewrite the terminal.
+- Zip entry names in the `compare-builds` and `check-build` output are shown on one line, with control and format characters as `\uXXXX`, so a hostile zip can't fake lines or rewrite the terminal (in the `--verbose` lines too).
 - `render --assets DIR` also writes `sf-test-plan-fragment.css`, the page's style sheet with every rule scoped to `.sf-test-plan`, for a host page that embeds a fragment.
-- The pinned-pair warning of `check-build` now ends in one period.
+- The pinned-pair warning of `check-build` now ends in one period (or the reason's own `!` or `?`).
 - GitHub Actions now makes the release itself when a `v` tag is pushed, after every test job passes.
 - The README's quest example has its own section, a "Known limits" section lists what is known and left alone, and the shared test cases for the PMT tools run as part of the unit tests.
 

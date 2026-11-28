@@ -97,7 +97,7 @@ def _pex_digest(h, data: bytes, name: str) -> str:
         h.update("\n".join(pex.listing(data)).encode("utf-8"))   # by meaning: string-table order ignored
         return h.hexdigest()[:16]
     except pex.PexError as err:
-        log.debug("%s: compared by bytes (compile time zeroed) because %s", name, err)
+        log.debug("%s: compared by bytes (compile time zeroed) because %s", one_line(name), err)
     if len(data) >= 16 and data[:4] in _PEX_MAGIC:
         data = data[:8] + b"\0" * 8 + data[16:]   # zero the compile time
     h.update(data)
@@ -247,7 +247,7 @@ def load_pins(path: str | None) -> dict:
         return {}
     fix = f'Give a JSON file like {{"format": "{PINS_FORMAT}", "pins": {{"mymod.esm": {{"tested": "<16 hex>", ' \
           '"built": "<16 hex>", "why": "<text>"}}}.'
-    data = results._load_json(path, fix)   # reads a byte-order mark and UTF-16 too, like every other JSON input
+    data = results._load_json(path, fix)   # reads a byte-order mark and UTF-16 too, like the marks and report files
     if not isinstance(data, dict) or data.get("format") != PINS_FORMAT:
         raise SetupError(f"the --pins file {path} has no \"format\": \"{PINS_FORMAT}\". {fix}")
     pins = data.get("pins")
@@ -350,7 +350,9 @@ def _compare(tested: str, built: str, pins: dict) -> dict:
             pin = pins.get(base)
             if pin and pin[0] == sa and pin[1] == sb:
                 add(name, "pinned", pin[2])
-                warnings.append(f"{name} differs, but the --pins file allows this exact pair: {pin[2].rstrip().rstrip('.')}.")
+                why = pin[2].strip()
+                why = f": {why}" + ("" if why.endswith((".", "!", "?")) else ".") if why else "."
+                warnings.append(f"{name} differs, but the --pins file allows this exact pair{why}")
                 continue
             add(name, "differs", detail)
             problems.append(f"{name} differs: {detail}.")

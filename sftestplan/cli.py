@@ -322,20 +322,39 @@ def _refuse_log_over_file(args) -> None:
     for path in [getattr(args, "plan", None)] + list(getattr(args, "plans", None) or []):
         if path:
             named.append((results.results_path(path), "the plan's results file"))
+    named += _default_outputs(args)
     for path, what in named:
         if path and _same_file(args.log, path):
             raise SetupError(f"--log {args.log} is {what}, so nothing was written. Give the log file another name.")
 
 
+def _default_outputs(args) -> list[tuple[str, str]]:
+    """The files a command writes when no --out names them (code review 0.5.1 round 1): build's page, logs' marks
+    file, rules' rule file and render's --assets files, so --log can't name one of them either."""
+    func, plan = getattr(args, "func", None), getattr(args, "plan", None)
+    out = []
+    if func is cmd_build and plan and not args.out:
+        out.append((_default_out(plan), "the default page"))
+    elif func is cmd_logs and getattr(args, "report", None) and not args.out:
+        out.append((os.path.splitext(args.report)[0] + ".marks.json", "the default marks file"))
+    elif func is cmd_rules and plan and not args.out and not args.from_file:
+        out.append((_default_rules_out(plan), "the default rule file"))
+    elif func is cmd_render and getattr(args, "assets", None):
+        out += [(os.path.join(args.assets, name), "one of the --assets files") for name, _ in render.HOST_ASSETS]
+    return out
+
+
 def _same_file(a: str, b: str) -> bool:
     """One file under two names: the same real path (links and letter case followed), or, for files that exist, the
-    same file on disk (a hard link has another path but is the same file)."""
+    same file on disk (a hard link has another path but is the same file). The disk check is used only when the
+    file system gives real file numbers: some network and cloud drives report 0 for every file."""
     if os.path.normcase(os.path.realpath(a)) == os.path.normcase(os.path.realpath(b)):
         return True
     try:
-        return os.path.samefile(a, b)
+        sa, sb = os.stat(a), os.stat(b)
     except (OSError, ValueError):
         return False
+    return sa.st_ino != 0 and os.path.samestat(sa, sb)
 
 
 # 0.5.1: files a report, page, log or marks file must never be written over (a typo for --out must not eat a mod).
@@ -344,14 +363,14 @@ _MOD_EXTENSIONS = {".esm", ".esp", ".esl", ".ba2", ".zip", ".7z", ".rar", ".stri
 
 
 def _refuse_mod_file_name(out: str, given: str, fix: str) -> None:
-    """Refuse an output named like a mod file (.esm, .ba2, .zip, ...) or holding a colon after the drive (an NTFS
+    """Refuse an output named like a mod file (.esm, .ba2, .zip, ...) or with a colon in its file name (an NTFS
     file stream). Windows drops trailing dots and spaces from a name, so MyMod.esm. counts as MyMod.esm."""
     name = os.path.basename(out)
     if os.name == "nt":
         name = name.rstrip(". ")
     if os.path.splitext(name)[1].lower() in _MOD_EXTENSIONS:
         raise SetupError(f"{given} is named like a mod file ({os.path.splitext(name)[1]}), so nothing was written. {fix}.")
-    if ":" in os.path.splitdrive(out)[1]:
+    if ":" in os.path.basename(out):   # the file's own name only: a Linux folder may hold a colon
         raise SetupError(f"{given} has a colon in its name (Windows would write a hidden file stream), so nothing "
                          f"was written. {fix}.")
 
@@ -533,6 +552,7 @@ def cmd_new(args) -> int:
     if os.path.isdir(args.plan):
         raise SetupError(f"{args.plan} is a folder, not a plan file. Give a file name, such as "
                          f"{args.plan}{os.sep}MyMod.testplan.md.")
+    _refuse_mod_file_name(args.plan, args.plan, "Give the plan a name such as MyMod.testplan.md")
     if os.path.exists(args.plan) and not args.force:
         raise SetupError(f"{args.plan} already exists. Pick another name, or add --force to replace it.")
     mod = args.mod or _mod_from_path(args.plan)
