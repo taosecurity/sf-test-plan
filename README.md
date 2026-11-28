@@ -40,7 +40,7 @@ Broken.testplan.md: 3 groups, 6 checks, 5 smoke; 1 errors, 0 warnings
 ## Install (two minutes)
 
 1. Install Python 3.11 or newer from [python.org](https://www.python.org/downloads/). On the first screen of the installer, tick **Add python.exe to PATH**. To check that it worked, open a new Command Prompt and type `python --version`. It should print a version number. (sf-test-plan itself needs Python 3.10 or newer, and is tested on 3.10 and 3.13 on Windows and Linux.)
-2. Download `sf-test-plan-0.5.0.zip` from the [releases page](https://github.com/taosecurity/sf-test-plan/releases) and unpack it anywhere.
+2. Download `sf-test-plan-0.5.1.zip` from the [releases page](https://github.com/taosecurity/sf-test-plan/releases) and unpack it anywhere.
 3. Open the unpacked folder in File Explorer, click the address bar at the top, type `cmd` and press Enter. A Command Prompt window opens in that folder, ready for the commands below.
 4. Build the example page with `sf-test-plan build examples\Beacon.testplan.md`, as in the Example above, and open `examples\Beacon.testplan.html` in your browser.
 
@@ -142,21 +142,6 @@ Every command also takes `--verbose` and `--log FILE`. The log file must not be 
 > sf-test-plan check examples\Beacon.testplan.md --rules examples\Beacon.logrules.json
 examples\Beacon.testplan.md: 3 groups, 6 checks, 5 smoke; 0 errors, 0 warnings
 ```
-
-### A quest example
-
-`examples\QuestExample.testplan.md` is a plan for a made-up quest mod, Tidewater Errand, whose quest has three stages. It shows how to test a quest honestly:
-
-- Each stage has one check that plays the stage, one check that types `getstage <QuestID>` in the console and says what number to expect, and a `note:` that names the console fix (`setstage <QuestID> <stage>`) for a stage that never starts. A stage you moved by hand is a Fail, so the note says to mark the check that plays that stage Fail on the page. The forced stage still writes its log line, so the plan says to bring the log's marks in with the page's Import button, where a mark set on the page wins over a Pass from the log. For the results row, the plan says to Export from the page after that and give the export to `sf-test-plan import`. The file from `sf-test-plan logs` doesn't hold the marks made on the page, so importing it alone would record the log's Pass.
-- The mod writes one `Debug.Trace` line for each stage change, and the plan's `log:` ids point at those lines. The rule file `examples\QuestExample.logrules.json` proves them, and its `order` rule proves that the stages came in the right order.
-- The Log checks group tells the tester to read the quest's stages in the save with `sf-save-reader quests <save> --data <Data folder> --filter <name> --details` (without `--data`, the quests have no names to filter on).
-
-```
-> sf-test-plan check examples\QuestExample.testplan.md --rules examples\QuestExample.logrules.json
-examples\QuestExample.testplan.md: 5 groups, 10 checks, 5 smoke; 0 errors, 0 warnings
-```
-
-Copy the two files, change the names, the quest ID and the log lines to your own, and keep one check per stage.
 
 ### import
 
@@ -360,6 +345,21 @@ FORMAT.md section 7 lists every key.
 - **Reset** clears the marks and notes on this page's steps in this browser. Marks that another build of the plan saved for steps this page doesn't have are kept, and the page says how many.
 - Marks are kept in the browser's local storage for that page. A private window, or a browser that blocks storage, keeps them only until you close the tab. The page says so, so use Export before you close it.
 
+## A quest example
+
+`examples\QuestExample.testplan.md` is a plan for a made-up quest mod, Tidewater Errand, whose quest has three stages. It shows how to test a quest honestly:
+
+- Each stage has one check that plays the stage, one check that types `getstage <QuestID>` in the console and says what number to expect, and a `note:` that names the console fix (`setstage <QuestID> <stage>`) for a stage that never starts. A stage you moved by hand is a Fail, so the note says to mark the check that plays that stage Fail on the page. The forced stage still writes its log line, so the plan says to bring the log's marks in with the page's Import button, where a mark set on the page wins over a Pass from the log. For the results row, the plan says to Export from the page after that and give the export to `sf-test-plan import`. The file from `sf-test-plan logs` doesn't hold the marks made on the page, so importing it alone would record the log's Pass.
+- The mod writes one `Debug.Trace` line for each stage change, and the plan's `log:` ids point at those lines. The rule file `examples\QuestExample.logrules.json` proves them, and its `order` rule proves that the stages came in the right order.
+- The Log checks group tells the tester to read the quest's stages in the save with `sf-save-reader quests <save> --data <Data folder> --filter <name> --details` (without `--data`, the quests have no names to filter on).
+
+```
+> sf-test-plan check examples\QuestExample.testplan.md --rules examples\QuestExample.logrules.json
+examples\QuestExample.testplan.md: 5 groups, 10 checks, 5 smoke; 0 errors, 0 warnings
+```
+
+Copy the two files, change the names, the quest ID and the log lines to your own, and keep one check per stage.
+
 ## Papyrus logs
 
 If you don't have a rule file yet, `sf-test-plan rules` (above) starts one from your plan. If your mod logs with `Debug.Trace` and you have a papyrus-log-check rule file for it, run papyrus-log-check on the log first, then give its JSON report to `logs`:
@@ -383,7 +383,7 @@ This is what `--verbose` prints for the example plan:
 
 ```
 > sf-test-plan check examples\Beacon.testplan.md --verbose
-[verbose] sf-test-plan 0.5.0, Python 3.13.15, args ['check', 'examples\\Beacon.testplan.md', '--verbose']
+[verbose] sf-test-plan 0.5.1, Python 3.13.15, args ['check', 'examples\\Beacon.testplan.md', '--verbose']
 [verbose] read plan examples\Beacon.testplan.md (1356 characters)
 [verbose] parsed examples\Beacon.testplan.md: title 'Beacon Mod test plan', run 'beacon-0.1.0', 2 setup items, 3 groups, 6 checks (5 smoke), 0 problems
 [verbose]   group 1 'Install and load' (line 13): 1.1 smoke, 1.2 smoke
@@ -395,6 +395,20 @@ examples\Beacon.testplan.md: 3 groups, 6 checks, 5 smoke; 0 errors, 0 warnings
 ## Background
 
 New to testing mods? The STEP project's [Mod Testing guide](https://wiki.step-project.com/Guide:Mod_Testing) explains testing against a clean setup and with new and existing saves. It's written for Skyrim, but the method carries over.
+
+## Known limits
+
+These are known and left as they are, because they need an unusual setup or have a plain workaround:
+
+- On Linux and macOS, `import` leaves the results file at mode 0600 and replaces a link with a plain file.
+- `new` follows a symbolic link at the plan's name, unlike the other writing commands.
+- A printed "then run" line whose path holds `$`, a backtick, `%` or `@` may not paste cleanly into PowerShell or cmd. The command itself works.
+- `"r": null` in a marks file is refused by `import` but accepted by the page's Import. Neither the page nor `logs` writes null.
+- A hand-edited browser store with a bad `saved` time shows "NaN" in the page's save line.
+- In a smoke round the page's tally leaves unmarked deep checks out, while `import` counts them as not run. This is deliberate.
+- Two `--pins` entries for same-named files in different folders collapse to one when written by bare file name. Write the key with its folder.
+- In one marks file that holds the same id twice (only a hand-merged file does), a newer log mark listed before an older page mark wins.
+- A path typed with the Windows long-path prefix (`\\?\C:\...`) is not matched with its plain spelling of the same file, so the check that an output is not an input can miss it.
 
 ## For developers
 

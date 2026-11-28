@@ -5,7 +5,7 @@ import re
 from dataclasses import dataclass, field
 
 TOOL = "sf-test-plan"
-VERSION = "0.5.0"
+VERSION = "0.5.1"
 TOOL_ID = f"{TOOL} {VERSION}"
 URL = "https://github.com/taosecurity/sf-test-plan"
 
