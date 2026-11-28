@@ -1,0 +1,35 @@
+{
+  "tool": "sf-test-plan",
+  "shared_version": 1,
+  "sets": ["out-paths", "damaged-inputs", "terminal-text", "paths-and-programs"],
+  "skipped_sets": {
+    "damaged-plugins": "sf-test-plan never reads a plugin header: it lists plugin names and file hashes from zip entries only."
+  },
+  "exit_codes": {"ok": [0], "finding": [1], "refuse": [2]},
+  "not_applicable": {
+    "out-inside-cleaned-folder": "sf-test-plan empties no folder during a run.",
+    "p-normal": "sf-test-plan starts no other program.",
+    "p-cwd-planted-path-has-real": "sf-test-plan starts no other program.",
+    "p-cwd-planted-only": "sf-test-plan starts no other program.",
+    "p-dot-entry": "sf-test-plan starts no other program.",
+    "p-empty-entry": "sf-test-plan starts no other program.",
+    "p-relative-entry": "sf-test-plan starts no other program.",
+    "p-quoted-entry": "sf-test-plan starts no other program.",
+    "p-path-order": "sf-test-plan starts no other program.",
+    "p-name-with-extension": "sf-test-plan starts no other program.",
+    "p-given-path": "sf-test-plan starts no other program.",
+    "p-system-tool": "sf-test-plan starts no other program.",
+    "c-case-twin-folders": "sf-test-plan looks up no folder by name.",
+    "s-inside-true": "sf-test-plan has no inside-a-folder test (it empties no folder).",
+    "s-inside-other-case": "sf-test-plan has no inside-a-folder test (it empties no folder).",
+    "s-inside-prefix-trap": "sf-test-plan has no inside-a-folder test (it empties no folder).",
+    "s-inside-itself": "sf-test-plan has no inside-a-folder test (it empties no folder).",
+    "text-bom-utf8.txt": "sf-test-plan reads no line list such as Plugins.txt.",
+    "text-empty.txt": "sf-test-plan reads no line list such as Plugins.txt.",
+    "text-nul-bytes.txt": "sf-test-plan reads no line list such as Plugins.txt.",
+    "text-utf16le-bom.txt": "sf-test-plan reads no line list such as Plugins.txt."
+  },
+  "known_limits": {
+    "s-long-path-prefix": "C: a path typed with the Windows long-path prefix is not matched with its plain spelling; nobody types it."
+  }
+}

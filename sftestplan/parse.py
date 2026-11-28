@@ -484,6 +484,9 @@ def load_rule_file(rules_path: str) -> dict:
     except json.JSONDecodeError as e:
         raise SetupError(f"{rules_path} isn't valid JSON (line {e.lineno}: {e.msg}). "
                          "Give the papyrus-log-check rule file (.json).")
+    except (RecursionError, ValueError):   # 0.5.1: nested far too deep, or a number with thousands of digits
+        raise SetupError(f"{rules_path} can't be read as JSON (nested too deeply, or a number is too long). "
+                         "Give the papyrus-log-check rule file (.json).")
     if not isinstance(data, dict):
         raise SetupError(f"{rules_path} isn't a papyrus-log-check rule file: it should be a JSON object "
                          "with 'expect' and 'forbid' lists.")

@@ -68,6 +68,9 @@ def _load_json(path: str, fix: str):
         return json.loads(text)
     except json.JSONDecodeError as e:
         raise SetupError(f"{path} isn't valid JSON (line {e.lineno}, column {e.colno}: {e.msg}). {fix}")
+    except (RecursionError, ValueError) as e:   # 0.5.1: nested far too deep, or a number with thousands of digits
+        why = "nested too deeply" if isinstance(e, RecursionError) else "a number in it is too long"
+        raise SetupError(f"{path} can't be read as JSON ({why}). {fix}")
 
 
 # ---------------------------------------------------------------- marks (FORMAT.md 3)
@@ -253,11 +256,12 @@ def _pick_mod(plan: Plan, mods: list[dict], mod: str | None) -> tuple[dict, str]
                      f"Pick one with --mod.")
 
 
-def logs_to_marks(plan: Plan, report: dict, mod: str | None, now: str) -> tuple[dict, list[str]]:
+def logs_to_marks(plan: Plan, report: dict, mod: str | None, now: str,
+                  source: str = "the report") -> tuple[dict, list[str]]:
     """papyrus-log-check JSON -> a marks dict (src "log") plus plain lines saying what was decided for each check."""
     fix = "Give the .json report papyrus-log-check (0.3.0 or later) wrote."
     if not isinstance(report, dict) or not isinstance(report.get("mods"), list):
-        raise SetupError(f"the report has no \"mods\" list, so it isn't a papyrus-log-check JSON report. {fix}")
+        raise SetupError(f"{source} has no \"mods\" list, so it isn't a papyrus-log-check JSON report. {fix}")
     mods = [m for m in report["mods"] if isinstance(m, dict)]
     if not mods:
         raise SetupError(f"the report lists no mods. Run papyrus-log-check with your mod's rule file. {fix}")

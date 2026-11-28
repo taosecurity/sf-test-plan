@@ -18,6 +18,7 @@ import re
 import shutil
 import struct
 import tempfile
+import unicodedata
 import zipfile
 import zlib
 
@@ -275,6 +276,22 @@ def compare(tested: str, built: str, pins: dict | None = None) -> dict:
         raise SetupError(f"can't read {tested} or {built}, or write a temporary file: {e.strerror or e}.")
 
 
+def one_line(text: str) -> str:
+    """A name from a zip or archive, safe to print on one line (0.5.1): line breaks, escape codes and other control
+    or format characters (bidi marks, zero-width characters) are written as \\n, \\r, \\t or \\uXXXX, so a name
+    in a downloaded zip can't fake a line or rewrite the terminal. Ordinary names come back unchanged."""
+    out = []
+    for ch in text:
+        if ch in "\n\r\t":
+            out.append({"\n": "\\n", "\r": "\\r", "\t": "\\t"}[ch])
+        elif unicodedata.category(ch) in ("Cc", "Cf", "Zl", "Zp"):
+            n = ord(ch)
+            out.append(f"\\u{n:04x}" if n < 0x10000 else f"\\U{n:08x}")
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
 def _compare(tested: str, built: str, pins: dict) -> dict:
     problems, warnings, entries = [], [], []
     with _open_zip(tested, "tested") as za, _open_zip(built, "built") as zb:
@@ -293,7 +310,7 @@ def _compare(tested: str, built: str, pins: dict) -> dict:
             entries.append({"name": name, "status": status, "detail": detail})
 
         for key in sorted(set(a) | set(b)):
-            name = (a.get(key) or b.get(key)).filename.replace("\\", "/")
+            name = one_line((a.get(key) or b.get(key)).filename.replace("\\", "/"))
             base = key.rsplit("/", 1)[-1]
             if key not in b:
                 add(name, "only in tested")
@@ -328,7 +345,7 @@ def _compare(tested: str, built: str, pins: dict) -> dict:
                     if not diff:
                         add(name, "same", "the files inside match (scripts compared by meaning)")
                         continue
-                    shown = ", ".join(diff[:5]) + (f" and {len(diff) - 5} more" if len(diff) > 5 else "")
+                    shown = ", ".join(one_line(k) for k in diff[:5]) + (f" and {len(diff) - 5} more" if len(diff) > 5 else "")
                     detail = f"{len(diff)} of its files differ ({shown}); {detail}"
             pin = pins.get(base)
             if pin and pin[0] == sa and pin[1] == sb:

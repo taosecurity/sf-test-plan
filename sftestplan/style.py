@@ -118,6 +118,9 @@ def load_style(path: str) -> Style:
         data = json.loads(text)
     except json.JSONDecodeError as e:
         raise SetupError(f"{path} isn't valid JSON (line {e.lineno}: {e.msg}). Give a style file (.json).")
+    except (RecursionError, ValueError):   # 0.5.1: nested far too deep, or a number with thousands of digits
+        raise SetupError(f"{path} can't be read as JSON (nested too deeply, or a number is too long). "
+                         "Give a style file (.json).")
     st = parse_style(data, path)
     log.debug("style file %s: level %s, smoke %s..%s, iso_dates %s, full_sentences %s, %d banned",
               path, st.level, st.smoke_min, st.smoke_max, st.iso_dates, st.full_sentences, len(st.banned))

@@ -32,7 +32,7 @@ def _setup_logging(verbose: bool, log_file: str | None) -> None:
             # backslashreplace: a path that isn't valid Unicode is written as \udcff, not a logging error
             fh = logging.FileHandler(log_file, mode="w", encoding="utf-8", errors="backslashreplace")
         except OSError as e:
-            raise SetupError(f"can't write the log file {log_file}: {e.strerror}. Pick a folder you can write to.")
+            raise SetupError(f"can't write the log file (--log {log_file}): {e.strerror}. Pick a folder you can write to.")
         fh.setLevel(logging.DEBUG)
         fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
         log.addHandler(fh)
@@ -239,7 +239,7 @@ def cmd_logs(args) -> int:
     if not args.force and os.path.isfile(out) and os.path.normcase(out) != os.path.normcase(os.devnull):
         raise SetupError(f"{given} already exists, so nothing was written. Add --force to replace it, or give the "
                          "marks file another name with --out.")
-    marks, lines = results.logs_to_marks(plan, report, args.mod, _now())
+    marks, lines = results.logs_to_marks(plan, report, args.mod, _now(), args.report)
     for line in lines:
         print(line)
     try:
@@ -315,6 +315,8 @@ _LOG_GUARDED = (("plan", "the plan"), ("marks", "the marks file"), ("report", "t
 def _refuse_log_over_file(args) -> None:
     """0.5.1: --log opens its file for writing first, so a --log that names an input (or the output) would empty
     it before it is read. Refuse it, before anything is written."""
+    if os.path.normcase(args.log) != os.path.normcase(os.devnull):
+        _refuse_mod_file_name(args.log, f"--log {args.log}", "Give the log file another name")
     named = [(getattr(args, attr, None), what) for attr, what in _LOG_GUARDED]
     named += [(p, "one of the plans") for p in getattr(args, "plans", None) or []]
     for path in [getattr(args, "plan", None)] + list(getattr(args, "plans", None) or []):
@@ -326,7 +328,32 @@ def _refuse_log_over_file(args) -> None:
 
 
 def _same_file(a: str, b: str) -> bool:
-    return os.path.normcase(os.path.realpath(a)) == os.path.normcase(os.path.realpath(b))
+    """One file under two names: the same real path (links and letter case followed), or, for files that exist, the
+    same file on disk (a hard link has another path but is the same file)."""
+    if os.path.normcase(os.path.realpath(a)) == os.path.normcase(os.path.realpath(b)):
+        return True
+    try:
+        return os.path.samefile(a, b)
+    except (OSError, ValueError):
+        return False
+
+
+# 0.5.1: files a report, page, log or marks file must never be written over (a typo for --out must not eat a mod).
+_MOD_EXTENSIONS = {".esm", ".esp", ".esl", ".ba2", ".zip", ".7z", ".rar", ".strings", ".dlstrings", ".ilstrings",
+                   ".pex", ".psc", ".dll"}
+
+
+def _refuse_mod_file_name(out: str, given: str, fix: str) -> None:
+    """Refuse an output named like a mod file (.esm, .ba2, .zip, ...) or holding a colon after the drive (an NTFS
+    file stream). Windows drops trailing dots and spaces from a name, so MyMod.esm. counts as MyMod.esm."""
+    name = os.path.basename(out)
+    if os.name == "nt":
+        name = name.rstrip(". ")
+    if os.path.splitext(name)[1].lower() in _MOD_EXTENSIONS:
+        raise SetupError(f"{given} is named like a mod file ({os.path.splitext(name)[1]}), so nothing was written. {fix}.")
+    if ":" in os.path.splitdrive(out)[1]:
+        raise SetupError(f"{given} has a colon in its name (Windows would write a hidden file stream), so nothing "
+                         f"was written. {fix}.")
 
 
 def _is_link(name: str) -> bool:
@@ -341,6 +368,7 @@ def _refuse_unsafe_output(out: str, given: str, fix: str) -> None:
     (NUL, /dev/null). Folders get their own message before this is called. It prints nothing itself."""
     if os.path.normcase(out) == os.path.normcase(os.devnull):
         return
+    _refuse_mod_file_name(out, given, fix)
     if _is_link(out):
         raise SetupError(f"{given} is a symbolic link, so nothing was written. {fix}.")
     if not os.path.lexists(out):
@@ -439,6 +467,9 @@ def cmd_rules(args) -> int:
     base = None
     if args.from_file:
         base = results._load_json(args.from_file, "Give the papyrus-log-check rule file (.json).")
+        if not isinstance(base, dict):   # 0.5.1: a null or list root was taken for "no --from file"
+            raise SetupError(f"--from {args.from_file} isn't a papyrus-log-check rule file: it should hold one JSON "
+                             "object. Give the papyrus-log-check rule file (.json).")
     mod = plan.mod or _mod_from_path(args.plan)
     data, added = rules.starter_rules(mod, plan.version, uses, prefix=args.prefix, plugins=args.plugin,
                                       base=base, base_name=args.from_file or "the rule file")
