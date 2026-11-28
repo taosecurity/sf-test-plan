@@ -1,0 +1,134 @@
+/* sf-test-plan fragment style: page.css with every rule scoped to .sf-test-plan, so linking it beside a fragment
+   in a host page does not restyle the host's own body, headings or links. Generated from page.css. */
+/* sf-test-plan page style. One reading column: a header with facts, a sticky tally and toolbar, then the checks.
+   Light and dark follow the system; set data-theme="light" or "dark" on <html> to force one. System fonts only. */
+.sf-test-plan{
+  --bg:#f3f4f2; --panel:#ffffff; --ink:#1d2328; --muted:#5b6670; --line:#d9ddd8;
+  --accent:#a65a08; --accent-soft:#f6e6d2; --code:#eceeea; --on-accent:#1b1206;
+  --tp-pass:#1f7a4d; --tp-pass-bg:#e1f3e8; --tp-fail:#b0321f; --tp-fail-bg:#fbe3de; --tp-skip:#5b6670; --tp-skip-bg:#e9ebe8;
+  --f-display:"Segoe UI Semibold","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  --f-body:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --f-mono:ui-monospace,"Cascadia Mono",Consolas,"SFMono-Regular",Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+:root:not([data-theme="light"]) .sf-test-plan{
+  --bg:#13171a; --panel:#1b2024; --ink:#e4e8ea; --muted:#9aa5ad; --line:#2d353b;
+  --accent:#f0a24a; --accent-soft:#3a2a17; --code:#232a2f; --on-accent:#1b1206;
+  --tp-pass:#6fd49c; --tp-pass-bg:#173527; --tp-fail:#ff9a85; --tp-fail-bg:#43201a; --tp-skip:#a3abb3; --tp-skip-bg:#262c31;
+  color-scheme:dark;
+}}
+:root[data-theme="dark"] .sf-test-plan{
+  --bg:#13171a; --panel:#1b2024; --ink:#e4e8ea; --muted:#9aa5ad; --line:#2d353b;
+  --accent:#f0a24a; --accent-soft:#3a2a17; --code:#232a2f; --on-accent:#1b1206;
+  --tp-pass:#6fd49c; --tp-pass-bg:#173527; --tp-fail:#ff9a85; --tp-fail-bg:#43201a; --tp-skip:#a3abb3; --tp-skip-bg:#262c31;
+  color-scheme:dark;
+}
+.sf-test-plan, .sf-test-plan *{box-sizing:border-box}
+.sf-test-plan{margin:0; background:var(--bg); color:var(--ink); font:16px/1.55 var(--f-body); overflow-wrap:break-word}
+.sf-test-plan .wrap{margin:0 auto; padding-block:28px 64px; padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); display:grid; gap:22px; max-width:76rem; min-width:0}
+.sf-test-plan .wrap > *{min-width:0}
+.sf-test-plan h1, .sf-test-plan h2, .sf-test-plan h3{font-family:var(--f-display); margin:0; text-wrap:balance}
+.sf-test-plan h1{font-size:32px; font-weight:700; line-height:1.15}
+.sf-test-plan h2{font-size:21px; font-weight:700; display:flex; gap:10px; align-items:baseline; flex-wrap:wrap}
+.sf-test-plan h2 .n{color:var(--accent); font-variant-numeric:tabular-nums}
+.sf-test-plan .eyebrow{font:600 12px var(--f-display); text-transform:uppercase; letter-spacing:.12em; color:var(--accent)}
+.sf-test-plan p{margin:0}
+.sf-test-plan .muted{color:var(--muted)}
+.sf-test-plan a{color:var(--accent)}
+.sf-test-plan code{font:13.5px var(--f-mono); background:var(--code); padding:1px 5px; border-radius:4px; overflow-wrap:anywhere}
+.sf-test-plan header{display:grid; gap:10px}
+.sf-test-plan .facts{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px 18px; margin:6px 0 0}
+.sf-test-plan .facts div{border-top:2px solid var(--line); padding-top:6px; min-width:0}
+.sf-test-plan .facts dt{font:600 12px var(--f-display); text-transform:uppercase; letter-spacing:.1em; color:var(--muted)}
+.sf-test-plan .facts dd{margin:2px 0 0; overflow-wrap:anywhere}
+.sf-test-plan .how{font-size:15px}
+.sf-test-plan .toc{display:flex; flex-wrap:wrap; gap:6px 14px; font-size:14px}
+/* Sticky tally, toolbar and save status. */
+.sf-test-plan .topbar{position:sticky; top:env(safe-area-inset-top, 0px); z-index:5; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px 14px; display:flex; flex-wrap:wrap; gap:8px 16px; align-items:center; justify-content:space-between}
+/* The page script fills #tally with span.tally-item.tally-<pass|fail|skip|open> and span.tally-total, and sets the
+   counts as --pass, --fail, --skip, --open and --total on it (so the colour tokens are named --tp-*). */
+.sf-test-plan .bar{display:flex; gap:6px 12px; flex-wrap:wrap; align-items:baseline; font-variant-numeric:tabular-nums; font-size:14px; flex:1 1 220px; min-width:0;
+  --p1:calc(var(--pass, 0) / max(var(--total, 1), 1) * 100%);
+  --p2:calc((var(--pass, 0) + var(--fail, 0)) / max(var(--total, 1), 1) * 100%);
+  --p3:calc((var(--pass, 0) + var(--fail, 0) + var(--skip, 0)) / max(var(--total, 1), 1) * 100%)}
+.sf-test-plan .bar b{font-weight:600}
+.sf-test-plan .bar::after{content:""; flex:1 0 100%; height:4px; border-radius:2px; background:linear-gradient(to right,
+  var(--tp-pass) 0 var(--p1), var(--tp-fail) var(--p1) var(--p2), var(--tp-skip) var(--p2) var(--p3), var(--line) var(--p3) 100%)}
+.sf-test-plan .t-pass, .sf-test-plan .tally-pass{color:var(--tp-pass)}
+.sf-test-plan .t-fail, .sf-test-plan .tally-fail{color:var(--tp-fail)}
+.sf-test-plan .t-skip, .sf-test-plan .tally-skip{color:var(--tp-skip)}
+.sf-test-plan .t-open, .sf-test-plan .tally-open, .sf-test-plan .tally-total{color:var(--muted)}
+.sf-test-plan .tools{display:flex; gap:8px; flex-wrap:wrap}
+.sf-test-plan .toolmsg{font-size:13px; color:var(--muted); width:100%}
+.sf-test-plan .toolmsg:empty{display:none}
+.sf-test-plan .toolmsg.ok{color:var(--tp-pass)}
+.sf-test-plan .toolmsg.warn{color:var(--tp-fail)}
+.sf-test-plan .copy-fallback{width:100%; min-height:120px; font:13px var(--f-mono); color:var(--ink); background:var(--bg); border:1px solid var(--line); border-radius:7px; padding:6px 9px}
+.sf-test-plan .saved{font-size:13px; color:var(--muted); width:100%; min-height:1em}
+.sf-test-plan .saved:empty{display:none}
+.sf-test-plan .saved.ok{color:var(--tp-pass)}
+.sf-test-plan .saved.warn{color:var(--tp-fail)}
+.sf-test-plan button{font:600 14px var(--f-body); border-radius:7px; padding:6px 14px; cursor:pointer; border:1px solid var(--line); background:var(--panel); color:var(--ink)}
+.sf-test-plan button:hover{border-color:var(--muted)}
+.sf-test-plan button.primary{background:var(--accent); border-color:var(--accent); color:var(--on-accent)}
+.sf-test-plan button:focus-visible, .sf-test-plan input:focus-visible, .sf-test-plan textarea:focus-visible, .sf-test-plan summary:focus-visible, .sf-test-plan a:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.sf-test-plan [hidden]{display:none !important}
+/* Sections and checks. */
+.sf-test-plan section{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px 18px 8px; display:grid; gap:10px; min-width:0}
+.sf-test-plan .prep{background:var(--accent-soft); border-color:transparent; padding-bottom:18px}
+.sf-test-plan .prep ol{margin:0; padding-left:22px; display:grid; gap:6px}
+.sf-test-plan section.smoke{border:2px solid var(--accent)}
+.sf-test-plan details.deep{display:grid; gap:22px}
+.sf-test-plan details.deep > summary{cursor:pointer; font:700 19px var(--f-display); padding:6px 0; list-style-position:inside}
+.sf-test-plan details.deep[open] > summary{margin-bottom:22px}
+.sf-test-plan details.deep > section + section{margin-top:22px}
+.sf-test-plan .checks{list-style:none; margin:0; padding:0}
+.sf-test-plan .check{border-top:1px solid var(--line); padding:12px 0; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px 16px}
+.sf-test-plan .check .what{min-width:0; display:grid; gap:4px}
+.sf-test-plan .check .id{font:500 12px var(--f-mono); color:var(--muted)}
+.sf-test-plan .check .expect{color:var(--muted); font-size:15px}
+.sf-test-plan .check .hint{color:var(--muted); font-size:14px; font-style:italic}
+.sf-test-plan .check .group-intro{color:var(--muted); font-size:14px; border-left:2px solid var(--line); padding-left:8px; margin-bottom:4px}
+.sf-test-plan .check .bylog{color:var(--muted); font-size:13px; border-left:2px solid var(--line); padding-left:8px}
+.sf-test-plan .check .from{color:var(--muted); font-size:12px}
+/* State classes the page script sets on li.check: is-pass, is-fail, is-skip, is-open, has-note, from-log. */
+.sf-test-plan .check.is-pass .id{color:var(--tp-pass)}
+.sf-test-plan .check.is-fail .id{color:var(--tp-fail)}
+.sf-test-plan .check.is-skip .id{color:var(--tp-skip)}
+.sf-test-plan .check.is-fail{box-shadow:inset 3px 0 0 var(--tp-fail); padding-left:10px}
+.sf-test-plan .logbadge{justify-self:start; font:600 11px var(--f-display); text-transform:uppercase; letter-spacing:.08em; padding:1px 8px; border-radius:999px; background:var(--tp-skip-bg); color:var(--muted)}
+.sf-test-plan .check.from-log .logbadge{background:var(--tp-pass-bg); color:var(--tp-pass)}
+.sf-test-plan .check.is-fail.from-log .logbadge{background:var(--tp-fail-bg); color:var(--tp-fail)}
+/* Controls the page script adds: Pass / Fail / Skip (radios, each followed by label.seg-<v>), the note box,
+   and button.copycmd after each code.cmd. The radios are hidden visually but stay focusable. */
+.sf-test-plan .seg{display:flex; border:1px solid var(--line); border-radius:8px; overflow:hidden; align-self:start; position:relative}
+.sf-test-plan .seg input{position:absolute; width:1px; height:1px; margin:0; opacity:0; pointer-events:none}
+.sf-test-plan .seg label{font:600 13px var(--f-body); padding:5px 10px; cursor:pointer; color:var(--muted); border-left:1px solid var(--line); user-select:none}
+.sf-test-plan .seg label:first-of-type{border-left:none}
+.sf-test-plan .seg input:focus-visible + label{outline:2px solid var(--accent); outline-offset:-2px}
+.sf-test-plan .seg input:checked + label.seg-pass{background:var(--tp-pass-bg); color:var(--tp-pass)}
+.sf-test-plan .seg input:checked + label.seg-fail{background:var(--tp-fail-bg); color:var(--tp-fail)}
+.sf-test-plan .seg input:checked + label.seg-skip{background:var(--tp-skip-bg); color:var(--tp-skip)}
+.sf-test-plan .note{grid-column:1 / -1}
+.sf-test-plan .note textarea, .sf-test-plan textarea.note{width:100%; min-height:34px; resize:vertical; font:14px var(--f-body); color:var(--ink); background:var(--bg); border:1px solid var(--line); border-radius:7px; padding:6px 9px}
+.sf-test-plan .copycmd{font:500 11px var(--f-mono); margin-left:4px; padding:1px 6px; border:1px solid var(--line); border-radius:4px; background:transparent; color:inherit; cursor:pointer; vertical-align:1px}
+.sf-test-plan .copycmd:hover{border-color:currentColor}
+/* Results log and footer. */
+.sf-test-plan .tbl{overflow-x:auto; max-width:100%}
+.sf-test-plan table{border-collapse:collapse; width:100%; font-size:14px}
+.sf-test-plan th, .sf-test-plan td{text-align:left; vertical-align:top; padding:7px 10px; border-top:1px solid var(--line)}
+.sf-test-plan th{font:600 12px var(--f-display); text-transform:uppercase; letter-spacing:.08em; color:var(--muted)}
+.sf-test-plan footer{font-size:14px; color:var(--muted); display:grid; gap:6px}
+@media (max-width:560px){
+.sf-test-plan .check{grid-template-columns:minmax(0,1fr)}
+.sf-test-plan h1{font-size:26px}
+.sf-test-plan section{padding:14px 14px 6px}
+.sf-test-plan .topbar{padding:8px 10px}
+.sf-test-plan button{padding:6px 10px}}
+@media (prefers-reduced-motion: reduce){
+.sf-test-plan, .sf-test-plan *{scroll-behavior:auto !important; transition:none !important}}
+@media print{
+.sf-test-plan .topbar .tools, .sf-test-plan .copycmd{display:none}
+.sf-test-plan .topbar{position:static}
+.sf-test-plan details.deep > *{display:block}}
