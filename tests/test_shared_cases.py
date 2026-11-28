@@ -39,6 +39,11 @@ def load(*parts):
         return json.load(f)
 
 
+def _read_bytes(path):
+    with open(path, "rb") as f:
+        return f.read()
+
+
 ADOPTION = load("ADOPTION.json")
 EXIT = ADOPTION["exit_codes"]
 CODES = set(EXIT["ok"]) | set(EXIT["finding"]) | set(EXIT["refuse"])
@@ -115,12 +120,12 @@ class OutPaths(Shared):
                 if inp:       # the input is a real plan (hard links share its bytes)
                     with open(os.path.join(self.t, inp), "w", encoding="utf-8", newline="\n") as fh:
                         fh.write(PLAN)
-                    before = open(os.path.join(self.t, inp), "rb").read()
+                    before = _read_bytes(os.path.join(self.t, inp))
                 else:
                     inp = "plan.testplan.md"
                     with open(os.path.join(self.t, inp), "w", encoding="utf-8", newline="\n") as fh:
                         fh.write(PLAN)
-                    before = open(os.path.join(self.t, inp), "rb").read()
+                    before = _read_bytes(os.path.join(self.t, inp))
                 out = self.t.replace("\\", "/") + "/" + case["out"]
                 plan = os.path.join(self.t, inp)
                 for opt, argv in (("--out", ["build", plan, "--out", out]),
@@ -128,7 +133,7 @@ class OutPaths(Shared):
                     started = set(os.listdir(self.t))
                     code, so, se = run(argv, cwd=self.t)
                     self.never(code, so, se, f"{cid} {opt}")
-                    after = open(plan, "rb").read()
+                    after = _read_bytes(plan)
                     if case["expect"] == "refuse":
                         self.assertIn(code, EXIT["refuse"], f"{cid} {opt}: exit {code}\n{so}{se}")
                         self.assertEqual(before, after, f"{cid} {opt}: the input changed")

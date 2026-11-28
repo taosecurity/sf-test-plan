@@ -247,7 +247,10 @@ def load_pins(path: str | None) -> dict:
         return {}
     fix = f'Give a JSON file like {{"format": "{PINS_FORMAT}", "pins": {{"mymod.esm": {{"tested": "<16 hex>", ' \
           '"built": "<16 hex>", "why": "<text>"}}}.'
-    data = results._load_json(path, fix)   # reads a byte-order mark and UTF-16 too, like the marks and report files
+    try:
+        data = results._load_json(path, fix)   # reads a byte-order mark and UTF-16 too, like the marks and report files
+    except SetupError as e:
+        raise SetupError(f"the --pins file: {e}") from None
     if not isinstance(data, dict) or data.get("format") != PINS_FORMAT:
         raise SetupError(f"the --pins file {path} has no \"format\": \"{PINS_FORMAT}\". {fix}")
     pins = data.get("pins")

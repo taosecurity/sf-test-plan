@@ -263,7 +263,7 @@ DIFFERENT: 1 of 1 files differ.
 ```
 > sf-test-plan compare-builds BeaconMod-0.1.0.zip BeaconMod-0.1.1.zip --pins pins.json
 BeaconMod.esm: pinned: rebuilt with the same content
-WARNING: BeaconMod.esm differs, but the --pins file allows this exact pair: rebuilt with the same content
+WARNING: BeaconMod.esm differs, but the --pins file allows this exact pair: rebuilt with the same content.
 OK: the built zip has the same plugins, scripts and other files as the tested zip.
 ```
 
@@ -406,7 +406,7 @@ These are known and left as they are, because they need an unusual setup or have
 - `"r": null` in a marks file is refused by `import` but accepted by the page's Import. Neither the page nor `logs` writes null.
 - A hand-edited browser store with a bad `saved` time shows "NaN" in the page's save line.
 - In a smoke round the page's tally leaves unmarked deep checks out, while `import` counts them as not run. This is deliberate.
-- Two `--pins` entries for same-named files in different folders collapse to one when written by bare file name. Write the key with its folder.
+- A `--pins` key is the file name without its folder (a key written with its folder is cut to the file name), so two same-named files in different folders share one pin, and only one of them can be accepted.
 - In one marks file that holds the same id twice (only a hand-merged file does), a newer log mark listed before an older page mark wins.
 - A path typed with the Windows long-path prefix (`\\?\C:\...`) is not matched with its plain spelling of the same file, so the check that an output is not an input can miss it.
 

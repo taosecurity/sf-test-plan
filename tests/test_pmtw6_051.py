@@ -329,5 +329,53 @@ class CodeReviewRound2(Base):
             self.assertIn(want, layout)
 
 
+class CodeReviewRound3(Base):
+    """0.5.1 code review round 3: the README's pins limit and pinned example match the code, a colon in a file
+    name is refused only on Windows, and a --pins read error names the option."""
+
+    def readme(self):
+        with open(os.path.join(ROOT, "README.md"), encoding="utf-8") as f:
+            return f.read()
+
+    def test_readme_gives_no_folder_key_workaround(self):
+        # load_pins cuts every key to its file name, so a key "with its folder" can't tell two files apart
+        p = self.write("pins.json", json.dumps({"format": "sf-test-plan-pins/1", "pins": {
+            "Data/SFSE/Plugins/a/mod.dll": {"tested": "0" * 16, "built": "1" * 16, "why": "a"},
+            "Data/SFSE/Plugins/b/mod.dll": {"tested": "2" * 16, "built": "3" * 16, "why": "b"}}}))
+        self.assertEqual(list(builds.load_pins(p)), ["mod.dll"])
+        self.assertNotIn("Write the key with its folder", self.readme())
+
+    def test_readme_pinned_warning_matches_the_output(self):
+        p = PinsFileReading("test_bom_and_utf16_pins_are_read")
+        p.d, p.path = self.d, self.path
+        a, b, sa, sb = p.zips()
+        pins = p.pins_bytes(sa, sb, "rebuilt with the same content", "utf-8")
+        code, out, err = run("compare-builds", a, b, "--pins", pins)
+        self.assertEqual(code, 0, out + err)
+        line = "WARNING: Mod.esm differs, but the --pins file allows this exact pair: rebuilt with the same content."
+        self.assertIn(line, out + err)
+        self.assertIn(line.replace("Mod.esm", "BeaconMod.esm") + "\n", self.readme())
+
+    def test_colon_in_a_file_name_is_refused_only_on_windows(self):
+        from unittest import mock
+        name = os.path.join("runs", "report-12:30.html")
+        with mock.patch.object(cli.os, "name", "posix"):
+            cli._refuse_mod_file_name(name, "--out x", "Fix")
+        with mock.patch.object(cli.os, "name", "nt"):
+            with self.assertRaises(cli.SetupError):
+                cli._refuse_mod_file_name(name, "--out x", "Fix")
+
+    def test_unreadable_pins_file_names_the_option(self):
+        a = self.zip("a.zip", {"Data/StarlightMod.esm": b"E"})
+        code, out, err = run("compare-builds", a, a, "--pins", self.path("pins.jsn"))
+        self.assertEqual(code, 2, out + err)
+        self.assertIn("the --pins file: can't read", err)
+        bad = self.write("bad.json", "{not json")
+        code, out, err = run("compare-builds", a, a, "--pins", bad)
+        self.assertEqual(code, 2, out + err)
+        self.assertIn("the --pins file: ", err)
+        self.assertIn("isn't valid JSON", err)
+
+
 if __name__ == "__main__":
     unittest.main()

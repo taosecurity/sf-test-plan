@@ -364,14 +364,14 @@ _MOD_EXTENSIONS = {".esm", ".esp", ".esl", ".ba2", ".zip", ".7z", ".rar", ".stri
 
 
 def _refuse_mod_file_name(out: str, given: str, fix: str) -> None:
-    """Refuse an output named like a mod file (.esm, .ba2, .zip, ...) or with a colon in its file name (an NTFS
-    file stream). Windows drops trailing dots and spaces from a name, so MyMod.esm. counts as MyMod.esm."""
+    """Refuse an output named like a mod file (.esm, .ba2, .zip, ...) or, on Windows, with a colon in its file name
+    (an NTFS file stream). Windows drops trailing dots and spaces from a name, so MyMod.esm. counts as MyMod.esm."""
     name = os.path.basename(out)
     if os.name == "nt":
         name = name.rstrip(". ")
     if os.path.splitext(name)[1].lower() in _MOD_EXTENSIONS:
         raise SetupError(f"{given} is named like a mod file ({os.path.splitext(name)[1]}), so nothing was written. {fix}.")
-    if ":" in os.path.basename(out):   # the file's own name only: a Linux folder may hold a colon
+    if os.name == "nt" and ":" in os.path.basename(out):   # the file's own name only; Linux and macOS allow colons
         raise SetupError(f"{given} has a colon in its name (Windows would write a hidden file stream), so nothing "
                          f"was written. {fix}.")
 
