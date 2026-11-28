@@ -8,6 +8,7 @@ import tempfile
 import unittest
 import zipfile
 from contextlib import redirect_stderr, redirect_stdout
+from unittest import mock
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
@@ -400,6 +401,43 @@ class CodeReviewRound4(Base):
         code, out, err = run("logs", report, "--plan", plan)
         self.assertEqual(code, 2, out + err)
         self.assertIn("empty-report.json lists no mods", err)
+
+
+class CodeReviewRound6(Base):
+    """0.5.1 code review round 6: a network path in a plan's zip: line is refused before anything opens it, and the
+    --pins reason is escaped like the zip names beside it."""
+
+    def test_network_zip_line_is_refused(self):
+        built = self.zip("b.zip", {"MyMod.esm": "x"})
+        for value in ("\\\\server\\share\\x.zip", "//server/share/x.zip", "\\\\?\\UNC\\server\\share\\x.zip"):
+            with self.subTest(value=value):
+                plan = self.write("p.testplan.md", "# T\nrun: a\nzip: " + value + "\n\n## 1 G\n- [ ] one\n")
+                with mock.patch.object(builds.os.path, "isfile", side_effect=AssertionError("opened")):
+                    with self.assertRaises(cli.SetupError) as cm:
+                        builds.tested_zip_from_plan(plan, value)
+                msg = str(cm.exception)
+                self.assertIn("network path", msg)
+                self.assertIn(plan, msg)
+                self.assertIn("--tested", msg)
+                code, out, err = run("check-build", plan, "--built", built)
+                self.assertEqual(code, 2, out + err)
+
+    def test_local_zip_lines_still_work(self):
+        plan = self.path("p.testplan.md")
+        self.assertEqual(builds.tested_zip_from_plan(plan, "Mod-0.1.0.zip"), os.path.join(self.d, "Mod-0.1.0.zip"))
+        absolute = os.path.join(self.d, "Mod-0.1.0.zip")
+        self.assertEqual(builds.tested_zip_from_plan(plan, absolute), absolute)
+
+    def test_pins_reason_is_escaped(self):
+        p = PinsFileReading("test_bom_and_utf16_pins_are_read")
+        p.d, p.path = self.d, self.path
+        a, b, sa, sb = p.zips()
+        pins = p.pins_bytes(sa, sb, "ok\nOK: fake line\x1b[2J", "utf-8")
+        code, out, err = run("check-build", self.write("p.testplan.md", PLAN), "--tested", a, "--built", b, "--pins", pins)
+        self.assertEqual(code, 0, out + err)
+        self.assertNotIn("\nOK: fake line", out)
+        self.assertNotIn("\x1b", out)
+        self.assertIn("ok\\nOK: fake line\\u001b[2J", out)
 
 
 if __name__ == "__main__":

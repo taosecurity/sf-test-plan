@@ -14,7 +14,8 @@ This release fixes what the 0.5.0 reviews found, makes the tool refuse more typo
 - JSON nested too deeply, or with a huge number, is refused naming the file (marks, report, pins, rules and style files). `logs` names the report file when it holds no mods list, and `rules --from` refuses a file whose top level is `null` or a list.
 - Zip entry names in the `compare-builds` and `check-build` output are shown on one line, with control and format characters as `\uXXXX`, so a hostile zip can't fake lines or rewrite the terminal (in the `--verbose` lines too).
 - `render --assets DIR` also writes `sf-test-plan-fragment.css`, the page's style sheet with every rule scoped to `.sf-test-plan`, for a host page that embeds a fragment.
-- The pinned-pair warning of `check-build` now ends in one period (or the reason's own `!` or `?`).
+- The pinned-pair warning of `compare-builds` and `check-build` now ends in one period (or the reason's own `!` or `?`), and the `--pins` file's reason is shown on one line, as the zip entry names are.
+- `check-build` refuses a plan whose `zip:` line is a network path (one that starts with `\\` or `//`), naming the plan, before it opens anything: on Windows even looking for such a file sends your sign-in to that computer. Give `--tested` instead; a network path typed with `--tested` is used as given.
 - GitHub Actions now makes the release itself when a `v` tag is pushed, after every test job passes.
 - The README's quest example has its own section, a "Known limits" section lists what is known and left alone, and the shared test cases for the PMT tools run as part of the unit tests.
 

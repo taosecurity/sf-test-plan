@@ -326,7 +326,11 @@ class PathsAndPrograms(Shared):
                 code, so, se = run(["check-build", plan, "--built", built], cwd=self.t, timeout=30)
                 self.never(code, so, se, cid)
                 self.assertLess(time.time() - t0, 10, f"{cid}: slow (did it try the network?)")
-                self.assertTrue(code in EXIT["refuse"] or "plan" in (so + se).lower(), f"{cid}: {code}\n{so}{se}")
+                text = so + se
+                self.assertIn(code, EXIT["refuse"], f"{cid}: {code}\n{text}")
+                self.assertIn("network path", text, f"{cid}: the refusal doesn't say why\n{text}")
+                self.assertIn(plan, text, f"{cid}: the refusal doesn't name the plan\n{text}")
+                self.assertIn("--tested", text, f"{cid}: the refusal doesn't give the fix\n{text}")
 
 
 if __name__ == "__main__":

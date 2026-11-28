@@ -352,8 +352,8 @@ def _compare(tested: str, built: str, pins: dict) -> dict:
                     detail = f"{len(diff)} of its files differ ({shown}); {detail}"
             pin = pins.get(base)
             if pin and pin[0] == sa and pin[1] == sb:
-                add(name, "pinned", pin[2])
-                why = pin[2].strip()
+                add(name, "pinned", one_line(pin[2]))
+                why = one_line(pin[2].strip())
                 why = f": {why}" + ("" if why.endswith((".", "!", "?")) else ".") if why else "."
                 warnings.append(f"{name} differs, but the --pins file allows this exact pair{why}")
                 continue
@@ -388,12 +388,22 @@ def as_json(result: dict) -> str:
     return json.dumps({k: result[k] for k in keep}, indent=2, ensure_ascii=False)
 
 
+def is_network_path(path: str) -> bool:
+    """True for a path that starts with two slashes or backslashes: a Windows network (UNC) path, \\\\?\\UNC\\ included."""
+    return path[:2] in ("\\\\", "//", "\\/", "/\\")
+
+
 def tested_zip_from_plan(plan_path: str, zip_value: str) -> str:
     """The plan's zip: value, resolved against the plan's own folder unless it is absolute. The plan's folder is
     kept as the user gave it, so a report names examples\\Mod-0.1.0.zip, not a long absolute path."""
     if not zip_value:
         raise SetupError(f"the plan {plan_path} has no zip: line, so there is no tested zip. Add zip: to the "
                          "plan's header or give --tested.")
+    if is_network_path(zip_value):
+        # A network path read from a file is never opened: on Windows even a file check sends the user's sign-in.
+        raise SetupError(f"the plan {plan_path} has a network path on its zip: line ({one_line(zip_value)}), which "
+                         "sf-test-plan doesn't open from a plan. Copy the zip to this PC and give --tested, or put "
+                         "a local path on the zip: line.")
     if os.path.isabs(zip_value):
         return zip_value
     return os.path.join(os.path.dirname(plan_path), zip_value)

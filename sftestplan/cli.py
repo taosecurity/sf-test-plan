@@ -652,7 +652,7 @@ def cmd_ngplus(args) -> int:
         if name in seen:
             raise SetupError(f"the mod {json.dumps(name)} is in both {seen[name]} and {p.path}. Give each mod once.")
         seen[name] = p.path
-    if base.zip and not os.path.isabs(base.zip):
+    if base.zip and not os.path.isabs(base.zip) and not builds.is_network_path(base.zip):
         # zip: is read from the plan's own folder (check-build), so point it from the shared plan's folder
         where = os.path.abspath(builds.tested_zip_from_plan(args.base, base.zip))
         try:
